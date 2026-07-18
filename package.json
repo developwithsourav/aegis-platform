@@ -1,31 +1,19 @@
 {
   "name": "aegis-platform",
   "private": true,
-  "version": "0.0.0",
+  "version": "1.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
-    "build": "tsc -b && vite build",
-    "lint": "eslint .",
-    "preview": "vite preview"
+    "dev": "convex dev",
+    "seed": "convex run seed:all",
+    "reset": "convex run seed:resetIncidents",
+    "harness": "python -m http.server 4300 --directory harness"
   },
   "dependencies": {
-    "convex": "^1.42.3",
-    "react": "^19.2.7",
-    "react-dom": "^19.2.7"
+    "convex": "^1.42.3"
   },
   "devDependencies": {
-    "@eslint/js": "^10.0.1",
-    "@types/node": "^24.13.2",
-    "@types/react": "^19.2.17",
-    "@types/react-dom": "^19.2.3",
-    "@vitejs/plugin-react": "^6.0.3",
-    "eslint": "^10.6.0",
-    "eslint-plugin-react-hooks": "^7.1.1",
-    "eslint-plugin-react-refresh": "^0.5.3",
-    "globals": "^17.7.0",
-    "typescript": "~6.0.2",
-    "typescript-eslint": "^8.62.0",
-    "vite": "^8.1.1"
-  }
+    "typescript": "~6.0.2"
+  },
+  "description": "AEGIS: AI Emergency Grid & Incident System. Real-time AI incident command for mass gatherings. Convex backend + EnterPro frontend."
 }
