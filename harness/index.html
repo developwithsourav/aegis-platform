@@ -1,0 +1,247 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>AEGIS Dev Harness</title>
+<style>
+  :root{--bg:#0a0a0c;--surf:#141417;--card:#1b1b1f;--line:#2a2a30;--red:#e11d2e;
+    --redsoft:rgba(225,29,46,.12);--ink:#f5f5f6;--mut:#8e8e96;--green:#22c55e;--amber:#f59e0b}
+  *{box-sizing:border-box;margin:0;font-family:"Segoe UI",system-ui,sans-serif}
+  body{background:var(--bg);color:var(--ink);min-height:100vh;font-size:14px}
+  header{display:flex;gap:10px;align-items:center;padding:10px 16px;background:var(--surf);border-bottom:1px solid var(--line)}
+  header b{letter-spacing:2px}
+  .tabs{margin-left:auto;display:flex;gap:6px}
+  .tab{padding:6px 14px;border-radius:16px;border:1px solid var(--line);background:none;color:var(--mut);cursor:pointer;font-weight:700;font-size:12px}
+  .tab.on{background:var(--red);border-color:var(--red);color:#fff}
+  main{max-width:1100px;margin:0 auto;padding:16px}
+  .view{display:none}.view.on{display:block}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px;margin-bottom:10px}
+  .cats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:8px 0}
+  .cat{padding:12px 8px;border-radius:10px;border:1px solid var(--line);background:var(--surf);color:var(--ink);cursor:pointer;text-align:center}
+  .cat.sel{background:var(--red);border-color:var(--red);font-weight:800}
+  input,textarea,select{width:100%;background:var(--surf);border:1px solid var(--line);border-radius:10px;color:var(--ink);padding:10px;margin:4px 0}
+  button.go{background:var(--red);color:#fff;border:0;border-radius:20px;padding:11px 20px;font-weight:800;cursor:pointer;letter-spacing:1px;width:100%}
+  button.mini{background:var(--green);color:#031;border:0;border-radius:14px;padding:6px 12px;font-weight:800;cursor:pointer;font-size:12px}
+  button.mini.gray{background:var(--surf);color:var(--mut);border:1px solid var(--line)}
+  .inc{border-left:3px solid var(--red);cursor:pointer}
+  .inc.p2{border-color:var(--amber)}.inc.p3,.inc.p4{border-color:var(--green)}
+  .tag{font-size:10.5px;font-weight:800;padding:2px 8px;border-radius:8px;background:var(--red);color:#fff}
+  .tag.p2{background:var(--amber);color:#210}.tag.p3,.tag.p4{background:var(--green);color:#031}
+  .mut{color:var(--mut);font-size:12px}
+  .banner{background:var(--amber);color:#210;font-weight:700;padding:10px 14px;border-radius:10px;margin-bottom:10px;display:none}
+  .cols{display:grid;grid-template-columns:1.1fr 1fr;gap:12px}
+  @media(max-width:800px){.cols{grid-template-columns:1fr}}
+  .help{display:flex;gap:8px;margin-top:8px}
+  .help a{flex:1;text-align:center;background:var(--surf);border:1px solid var(--line);border-radius:10px;color:var(--ink);padding:8px;text-decoration:none;font-weight:700;font-size:12px}
+  .sop{padding:7px 10px;background:var(--surf);border-radius:8px;margin:5px 0;font-size:12.5px}
+  .ev{font-size:11.5px;color:var(--mut);margin:4px 0}
+  #status{font-size:11px;color:var(--mut)}
+</style>
+</head>
+<body>
+<header><span style="color:var(--red)">&#9679;</span><b>AEGIS</b><span class="mut">dev harness</span>
+  <span id="status">connecting...</span>
+  <div class="tabs">
+    <button class="tab on" data-v="rep">REPORTER</button>
+    <button class="tab" data-v="cmd">COMMAND</button>
+    <button class="tab" data-v="res">RESPONDER</button>
+  </div>
+</header>
+<main>
+  <div class="banner" id="banner"></div>
+
+  <!-- REPORTER -->
+  <div class="view on" id="v-rep">
+    <div class="card" id="repForm">
+      <b>Report an emergency</b>
+      <div class="cats" id="cats"></div>
+      <div class="mut" id="gps">Locating...</div>
+      <textarea id="desc" rows="2" placeholder="What is happening? (optional)"></textarea>
+      <input id="phone" placeholder="Callback number (optional, skip freely)">
+      <button class="go" id="send" disabled>SEND REPORT</button>
+      <div class="help">
+        <a href="tel:112">112 ALL</a><a href="tel:100">100 POLICE</a>
+        <a href="tel:101">101 FIRE</a><a href="tel:102">102 AMBULANCE</a>
+      </div>
+    </div>
+    <div class="card" id="repTrack" style="display:none">
+      <b>Your report</b> <span class="mut" id="tId"></span>
+      <div id="tStatus" style="margin:8px 0;font-weight:700"></div>
+      <div id="tResp" class="mut"></div>
+      <div id="tSops"></div>
+      <button class="mini gray" onclick="location.reload()" style="margin-top:10px">REPORT ANOTHER</button>
+    </div>
+  </div>
+
+  <!-- COMMAND -->
+  <div class="view" id="v-cmd">
+    <div class="card" id="loginCard">
+      <b>Operator login</b>
+      <input id="lEmail" placeholder="email" value="operator">
+      <input id="lPass" type="password" placeholder="password">
+      <button class="go" id="lGo">LOG IN</button>
+    </div>
+    <div id="dash" style="display:none">
+      <div class="card">
+        <b>Broadcast exit guidance</b>
+        <input id="bMsg" placeholder="e.g. Evacuate via Gate 3B. Avoid east concourse.">
+        <div style="display:flex;gap:8px;margin-top:6px">
+          <button class="mini" id="bSend">SEND</button>
+          <button class="mini gray" id="bClear">CLEAR</button>
+        </div>
+      </div>
+      <div class="cols">
+        <div id="queue"></div>
+        <div id="detail" class="card"><span class="mut">Select an incident.</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- RESPONDER -->
+  <div class="view" id="v-res">
+    <div class="card">
+      <b>I am responder</b>
+      <select id="rSel"></select>
+      <div id="rJob" class="mut" style="margin-top:8px">No assignment.</div>
+      <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap" id="rBtns"></div>
+      <label class="mut" style="display:block;margin-top:8px">
+        <input type="checkbox" id="simMove" style="width:auto"> simulate movement toward incident (demo mode)
+      </label>
+    </div>
+  </div>
+</main>
+
+<script type="module">
+import { ConvexClient } from "https://esm.sh/convex@1.42.3/browser";
+import { anyApi } from "https://esm.sh/convex@1.42.3/server";
+const URL_ = new URLSearchParams(location.search).get("deploy") || "http://127.0.0.1:3210";
+const client = new ConvexClient(URL_);
+const api = anyApi;
+const $ = (id) => document.getElementById(id);
+$("status").textContent = URL_;
+
+/* tabs */
+document.querySelectorAll(".tab").forEach(t => t.onclick = () => {
+  document.querySelectorAll(".tab").forEach(x => x.classList.toggle("on", x === t));
+  document.querySelectorAll(".view").forEach(v => v.classList.toggle("on", v.id === "v-" + t.dataset.v));
+});
+
+/* broadcast banner everywhere */
+client.onUpdate(api.incidents.activeBroadcast, {}, (b) => {
+  $("banner").style.display = b ? "block" : "none";
+  if (b) $("banner").textContent = "ANNOUNCEMENT: " + b.message;
+});
+
+/* ---------- REPORTER ---------- */
+const CATS = { fire:"Fire", medical:"Medical", crowd:"Crowd", accident_infra:"Accident", violence_security:"Violence", other:"Other" };
+let cat = null, pos = null, myIncident = null;
+for (const [k, label] of Object.entries(CATS)) {
+  const b = document.createElement("button");
+  b.className = "cat"; b.textContent = label;
+  b.onclick = () => { cat = k;
+    document.querySelectorAll(".cat").forEach(x => x.classList.toggle("sel", x === b));
+    $("send").disabled = false; };
+  $("cats").appendChild(b);
+}
+navigator.geolocation?.getCurrentPosition(
+  p => { pos = { lat: p.coords.latitude, lng: p.coords.longitude }; $("gps").textContent = `GPS locked (${pos.lat.toFixed(4)}, ${pos.lng.toFixed(4)})`; },
+  () => { pos = { lat: 28.5349, lng: 77.3921 }; $("gps").textContent = "GPS denied, using demo location (Gate 3)"; },
+  { timeout: 4000 });
+if (!("geolocation" in navigator)) { pos = { lat: 28.5349, lng: 77.3921 }; $("gps").textContent = "No GPS, demo location (Gate 3)"; }
+
+$("send").onclick = async () => {
+  const args = { category: cat, description: $("desc").value.trim() || undefined,
+    phone: $("phone").value.trim() || undefined, lat: pos?.lat, lng: pos?.lng };
+  const res = await client.mutation(api.incidents.submitReport, args);
+  myIncident = res.incidentId;
+  $("repForm").style.display = "none"; $("repTrack").style.display = "block";
+  $("tId").textContent = res.incidentId.slice(-8) + (res.merged ? " (merged with nearby reports)" : "");
+  client.onUpdate(api.incidents.trackIncident, { incidentId: myIncident }, (t) => {
+    if (!t) return;
+    $("tStatus").textContent = ({ai_processing:"AI analyzing your report...",verified:"Verified. Finding responder...",
+      dispatched:"Responder assigned!",en_route:"Help is on the way",on_scene:"Responder has arrived",resolved:"Resolved. Stay safe."})[t.status] ?? t.status;
+    $("tResp").textContent = t.responder ? `${t.responder.role} ${t.responder.code}, ETA ${t.responder.etaMin} min` : "";
+    $("tSops").innerHTML = t.sopSteps.length
+      ? "<div style='margin-top:8px;font-weight:700'>While you wait (AI guidance):</div>" +
+        t.sopSteps.map(s => `<div class="sop">${s}</div>`).join("") +
+        `<div class="mut" style="font-size:10.5px">Source: ${t.sopSource}</div>` : "";
+  });
+};
+
+/* ---------- COMMAND ---------- */
+let selId = null;
+$("lGo").onclick = async () => {
+  const r = await client.query(api.incidents.login, { email: $("lEmail").value, password: $("lPass").value });
+  if (!r.ok) { alert("Wrong credentials"); return; }
+  $("loginCard").style.display = "none"; $("dash").style.display = "block";
+};
+$("bSend").onclick = () => client.mutation(api.incidents.sendBroadcast, { message: $("bMsg").value });
+$("bClear").onclick = () => client.mutation(api.incidents.clearBroadcast, {});
+client.onUpdate(api.incidents.liveBoard, {}, (list) => {
+  $("queue").innerHTML = list.filter(i => i.status !== "resolved").map(i => `
+    <div class="card inc p${i.priority}" onclick="window.sel('${i._id}')">
+      <span class="tag p${i.priority}">P${i.priority}</span> <b>${i.headline}</b>
+      <div class="mut">${i.reportCount} report(s) · conf ${i.confidence}% · ${i.status}${i.responder ? " · " + i.responder.code : ""}</div>
+    </div>`).join("") || '<div class="card mut">No active incidents.</div>';
+  if (selId) renderDetail();
+});
+window.sel = (id) => { selId = id; renderDetail(); };
+async function renderDetail() {
+  const d = await client.query(api.incidents.incidentDetail, { incidentId: selId });
+  if (!d) return;
+  $("detail").innerHTML = `
+    <span class="tag p${d.priority}">P${d.priority}</span> <b>${d.headline}</b>
+    <div class="mut" style="margin:6px 0">${d.summary}</div>
+    ${d.photos.map(u => `<img src="${u}" style="max-width:100%;border-radius:8px;margin:4px 0">`).join("")}
+    <div style="font-weight:700;margin-top:6px">SOP (${d.sopSource})</div>
+    ${d.sopSteps.map(s => `<div class="sop">${s}</div>`).join("")}
+    <div style="display:flex;gap:8px;margin:10px 0">
+      ${!d.assignedResponderId && d.status !== "resolved" ? `<button class="mini" onclick="window.disp('${d._id}')">DISPATCH NEAREST</button>` : ""}
+      ${d.status !== "resolved" ? `<button class="mini gray" onclick="window.reso('${d._id}')">RESOLVE</button>` : ""}
+    </div>
+    ${d.events.map(e => `<div class="ev">${new Date(e._creationTime).toLocaleTimeString()} · ${e.msg}</div>`).join("")}`;
+}
+window.disp = (id) => client.mutation(api.incidents.dispatch, { incidentId: id });
+window.reso = (id) => client.mutation(api.incidents.resolve, { incidentId: id });
+
+/* ---------- RESPONDER ---------- */
+let myResp = null, simTimer = null;
+client.onUpdate(api.incidents.respondersList, {}, (rs) => {
+  if ($("rSel").options.length) return;
+  rs.forEach(r => { const o = document.createElement("option");
+    o.value = r._id; o.textContent = `${r.code} (${r.role})`; $("rSel").appendChild(o); });
+  myResp = rs[0]?._id;
+});
+$("rSel").onchange = () => myResp = $("rSel").value;
+client.onUpdate(api.incidents.liveBoard, {}, (list) => {
+  const job = list.find(i => i.responder && $("rSel").selectedOptions[0]?.textContent.startsWith(i.responder.code) && i.status !== "resolved");
+  if (!job) { $("rJob").textContent = "No assignment."; $("rBtns").innerHTML = ""; stopSim(); return; }
+  $("rJob").innerHTML = `<span class="tag p${job.priority}">P${job.priority}</span> <b>${job.headline}</b> · ${job.status}`;
+  $("rBtns").innerHTML = `
+    ${job.status === "dispatched" ? `<button class="mini" onclick="window.acc('${job._id}')">ACCEPT</button>` : ""}
+    ${job.status === "en_route" ? `<button class="mini" onclick="window.scene('${job._id}')">ON SCENE</button>` : ""}
+    ${job.status === "on_scene" ? `<button class="mini" onclick="window.reso('${job._id}')">RESOLVED</button>` : ""}`;
+  if ($("simMove").checked && job.status === "en_route") startSim(job); else if (job.status !== "en_route") stopSim();
+});
+window.acc = (id) => client.mutation(api.incidents.acceptAssignment, { incidentId: id });
+window.scene = (id) => client.mutation(api.incidents.markOnScene, { incidentId: id });
+function startSim(job) {
+  if (simTimer) return;
+  simTimer = setInterval(async () => {
+    const rs = await client.query(api.incidents.respondersList, {});
+    const me = rs.find(r => r._id === (myResp ?? $("rSel").value));
+    if (!me) return;
+    const nl = me.lat + (job.lat - me.lat) * 0.25, ng = me.lng + (job.lng - me.lng) * 0.25;
+    await client.mutation(api.incidents.updateResponderLocation, { responderId: me._id, lat: nl, lng: ng });
+  }, 3000);
+}
+function stopSim() { if (simTimer) { clearInterval(simTimer); simTimer = null; } }
+/* real GPS mode: when not simulating, share device location while page open */
+navigator.geolocation?.watchPosition(p => {
+  if ($("simMove").checked || !myResp) return;
+  client.mutation(api.incidents.updateResponderLocation,
+    { responderId: myResp, lat: p.coords.latitude, lng: p.coords.longitude });
+}, () => {}, { enableHighAccuracy: true });
+</script>
+</body>
+</html>

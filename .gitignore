@@ -22,3 +22,11 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Secrets and local env
+.env
+.env.*
+!.env.example
+
+# Convex generated code (rebuilt by npx convex dev)
+convex/_generated/
