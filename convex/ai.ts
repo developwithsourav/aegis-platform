@@ -63,10 +63,13 @@ async function embed(text: string): Promise<number[] | null> {
   try {
     if (provider === "gemini" && process.env.GEMINI_API_KEY) {
       const r = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-embedding-001:embedContent?key=${process.env.GEMINI_API_KEY}`,
+        "https://generativelanguage.googleapis.com/v1beta/models/gemini-embedding-001:embedContent",
         {
           method: "POST", signal: timeout,
-          headers: { "content-type": "application/json" },
+          headers: {
+            "content-type": "application/json",
+            "x-goog-api-key": process.env.GEMINI_API_KEY,
+          },
           body: JSON.stringify({
             model: "models/gemini-embedding-001",
             content: { parts: [{ text }] },
@@ -165,15 +168,23 @@ async function callLLM(prompt: string): Promise<string | null> {
       return j.choices?.[0]?.message?.content ?? null;
     }
     if (provider === "gemini" && process.env.GEMINI_API_KEY) {
+      // gemini-flash-latest: the 2.5-* aliases 404 for accounts created after
+      // their cutoff, and 2.0-flash hits the free-tier per-minute cap fastest.
       const r = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${process.env.GEMINI_API_KEY}`,
+        "https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent",
         {
           method: "POST", signal: timeout,
-          headers: { "content-type": "application/json" },
+          headers: {
+            "content-type": "application/json",
+            "x-goog-api-key": process.env.GEMINI_API_KEY,
+          },
           body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] }),
         });
       const j = await r.json();
-      return j.candidates?.[0]?.content?.parts?.[0]?.text ?? null;
+      if (j.error) { console.log(`[triage] gemini error ${j.error.code}: ${j.error.message}`); return null; }
+      // Thinking models can emit a thought part first, so take the first part
+      // that actually carries text rather than assuming index 0.
+      return j.candidates?.[0]?.content?.parts?.find((p: any) => p.text)?.text ?? null;
     }
   } catch { return null; }
   return null;
