@@ -26,6 +26,8 @@ by a live Convex backend; connect to it, do not invent one.
     /           Reporter  (public, no login)
     /responder  Responder (venue staff passcode)
     /command    Command   (operator login)
+  Plus one catch-all that REDIRECTS to / — a mistyped URL must land on the
+  Reporter, never on a blank page or a 404. It is a redirect, not a fourth page.
 - No landing page, no marketing site, no sign-up, no user accounts, no backend
   code, no API routes, no database. The backend exists and is live.
 - ALL data access lives in one file, src/aegis-backend.js, given verbatim below.
