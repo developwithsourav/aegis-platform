@@ -57,7 +57,7 @@ npm run harness           # dev client at http://localhost:4300
 
 No Convex account? Develop fully locally: `CONVEX_AGENT_MODE=anonymous npx convex dev`.
 
-Open two browser windows on the harness: **Reporter** in one, **Command** in the other (default operator login `operator` / `<removed>`, override via env vars). Send a report and watch it appear, triage, merge duplicates, dispatch and track, live, no refresh.
+Open two browser windows on the harness: **Reporter** in one, **Command** in the other. The dashboard is gated by an operator login set via the `OPERATOR_EMAIL` / `OPERATOR_PASSWORD` environment variables on the deployment (never committed). Send a report and watch it appear, triage, merge duplicates, dispatch and track, live, no refresh.
 
 Optional AI upgrade: set `LLM_PROVIDER` and the matching API key in the Convex dashboard (see `.env.example`). Without a key the deterministic triage + SOP lookup path runs, which is also our designed "AI unavailable" mode.
 

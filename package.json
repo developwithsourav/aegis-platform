@@ -13,6 +13,7 @@
     "convex": "^1.42.3"
   },
   "devDependencies": {
+    "@types/node": "^26.1.1",
     "typescript": "~6.0.2"
   },
   "description": "AEGIS: AI Emergency Grid & Incident System. Real-time AI incident command for mass gatherings. Convex backend + EnterPro frontend."

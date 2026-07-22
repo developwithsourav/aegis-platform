@@ -226,8 +226,11 @@ export const clearBroadcast = mutation({
 export const login = query({
   args: { email: v.string(), password: v.string() },
   handler: async (_ctx, { email, password }) => {
+    // Fail closed: with no OPERATOR_PASSWORD configured on the deployment,
+    // nobody gets in. Never fall back to a default that lives in the repo.
     const okEmail = (process.env.OPERATOR_EMAIL ?? "operator").toLowerCase();
-    const okPass = process.env.OPERATOR_PASSWORD ?? "<removed>";
+    const okPass = process.env.OPERATOR_PASSWORD;
+    if (!okPass) return { ok: false };
     const ok = email.toLowerCase() === okEmail && password === okPass;
     return ok ? { ok: true, name: "Control Room" } : { ok: false };
   },

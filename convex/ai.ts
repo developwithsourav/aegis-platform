@@ -1,4 +1,4 @@
-import { internalAction, internalQuery } from "./_generated/server";
+import { action, internalAction, internalMutation, internalQuery } from "./_generated/server";
 import { internal } from "./_generated/api";
 import { v } from "convex/values";
 
@@ -36,6 +36,76 @@ export const getSopsByIds = internalQuery({
     const out = [];
     for (const id of ids) { const d = await ctx.db.get(id); if (d) out.push(d); }
     return out;
+  },
+});
+
+// ---------- embeddings (RAG over the SOP knowledge base) ----------
+
+export const listSopsForEmbedding = internalQuery({
+  args: {},
+  handler: async (ctx) => await ctx.db.query("sops").collect(),
+});
+
+export const setSopEmbedding = internalMutation({
+  args: { id: v.id("sops"), embedding: v.array(v.float64()) },
+  handler: async (ctx, { id, embedding }) => await ctx.db.patch(id, { embedding }),
+});
+
+/* One embedding helper for both providers, always emitting 1536 dims so the
+   vector index in schema.ts never has to change when we swap providers.
+   Gemini returns unnormalised vectors at non-default dimensions, so we unit
+   normalise; OpenAI already returns normalised vectors at 1536. */
+const EMBED_DIMS = 1536;
+
+async function embed(text: string): Promise<number[] | null> {
+  const provider = process.env.LLM_PROVIDER ?? "";
+  const timeout = AbortSignal.timeout(15_000);
+  try {
+    if (provider === "gemini" && process.env.GEMINI_API_KEY) {
+      const r = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-embedding-001:embedContent?key=${process.env.GEMINI_API_KEY}`,
+        {
+          method: "POST", signal: timeout,
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            model: "models/gemini-embedding-001",
+            content: { parts: [{ text }] },
+            outputDimensionality: EMBED_DIMS,
+          }),
+        });
+      const j = await r.json();
+      const vals: number[] | undefined = j.embedding?.values;
+      if (!vals?.length) return null;
+      const norm = Math.hypot(...vals) || 1;
+      return vals.map((x) => x / norm);
+    }
+    if (process.env.OPENAI_API_KEY) {
+      const r = await fetch("https://api.openai.com/v1/embeddings", {
+        method: "POST", signal: timeout,
+        headers: { "content-type": "application/json", authorization: `Bearer ${process.env.OPENAI_API_KEY}` },
+        body: JSON.stringify({ model: "text-embedding-3-small", input: text, dimensions: EMBED_DIMS }),
+      });
+      const j = await r.json();
+      return j.data?.[0]?.embedding ?? null;
+    }
+  } catch { return null; }
+  return null;
+}
+
+/* Run once after seeding: npx convex run ai:embedAllSops
+   Safe to re-run; it simply recomputes every SOP vector. */
+export const embedAllSops = action({
+  args: {},
+  handler: async (ctx): Promise<{ embedded: number; failed: number }> => {
+    const sops = await ctx.runQuery(internal.ai.listSopsForEmbedding, {});
+    let embedded = 0, failed = 0;
+    for (const s of sops) {
+      const vec = await embed(`${s.category}: ${s.title}. ${s.text}`);
+      if (!vec) { failed++; continue; }
+      await ctx.runMutation(internal.ai.setSopEmbedding, { id: s._id, embedding: vec });
+      embedded++;
+    }
+    return { embedded, failed };
   },
 });
 
@@ -116,11 +186,22 @@ export const triage = internalAction({
     if (!data) return;
     const { inc, description, hasPhoto } = data;
 
-    // 1. Retrieve SOPs (vector search if embeddings are seeded, else category index)
-    let sopDocs = await ctx.runQuery(internal.ai.getSopsByCategory, { category: inc.category });
-    // (vector path can be enabled once embeddings are seeded:
-    //  const hits = await ctx.vectorSearch("sops", "by_embedding", { vector, limit: 4 });
-    //  sopDocs = await ctx.runQuery(internal.ai.getSopsByIds, { ids: hits.map(h => h._id) });)
+    // 1. Retrieve SOPs. Preferred path is semantic vector search over the NDMA
+    //    knowledge base; if embeddings are not seeded or the embedding call
+    //    fails we fall back to the category index so triage never blocks.
+    let sopDocs = null;
+    let retrieval = "category index";
+    const queryVec = await embed(`${inc.category} emergency at ${inc.zone}. ${description}`);
+    if (queryVec) {
+      const hits = await ctx.vectorSearch("sops", "by_embedding", { vector: queryVec, limit: 4 });
+      if (hits.length) {
+        const docs = await ctx.runQuery(internal.ai.getSopsByIds, { ids: hits.map((h) => h._id) });
+        if (docs.length) { sopDocs = docs; retrieval = "vector search"; }
+      }
+    }
+    if (!sopDocs)
+      sopDocs = await ctx.runQuery(internal.ai.getSopsByCategory, { category: inc.category });
+    console.log(`[triage] SOP retrieval via ${retrieval}, ${sopDocs.length} docs`);
 
     const rules = ruleTriage(inc.category, description, inc.zone);
     const sopSteps = sopDocs.map((d) => d.text);
