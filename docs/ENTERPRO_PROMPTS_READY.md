@@ -16,11 +16,25 @@ visual fixes, edit the code directly instead.
 Build a React app called AEGIS — an AI emergency response system for crowded
 venues such as concerts, festivals and stadiums.
 
-DESIGN SYSTEM "Guardian Red" — a professional emergency product, dark UI.
-Colors: background #0A0A0C, surface #141417, card #1B1B1F, border #2A2A30,
-primary red #E11D2E, soft red rgba(225,29,46,0.12), text #F5F5F6,
-muted #8E8E96, success green #22C55E, warning amber #F59E0B.
-NEVER use blue anywhere.
+DESIGN SYSTEM "Guardian Red" — a professional emergency product, TWO surfaces.
+
+PUBLIC SURFACE (the Reporter route) is LIGHT, so it stays readable outdoors in
+direct sunlight: page #FFFFFF, subtle panel #F7F8FA, border #E8E9EC,
+text #0A0A0C, muted #6B6C72, primary red #E11D2E, soft red #FDECEE.
+The Reporter HOME screen is the one exception: a dark cinematic hero
+(#0A0A0C with a dimmed crowd photograph) carrying the round red SOS button.
+Every screen after it is light.
+
+OPERATIONAL SURFACE (Command and Responder routes) is DARK, for a control room
+and a projector: background #0A0A0C, surface #141417, card #1B1B1F,
+border #2A2A30, text #F5F5F6, muted #8E8E96.
+
+Shared accents on both: primary red #E11D2E, success green #22C55E,
+warning amber #F59E0B. Priority colors: P1 red, P2 amber, P3 and P4 green.
+Responder role colors are allowed and only used for the role badge and route
+line: fire red, medical green, security purple, police blue. Outside of that
+role badge, never use blue as a UI color.
+
 Type: Inter or system font. Tight, confident, high contrast. Numbers and unit
 codes in tabular/mono. Uppercase micro-labels with letter-spacing for status chips.
 Form: rounded corners 12-16px, generous padding, 1px borders rather than shadows,
@@ -62,40 +76,62 @@ Do not build a landing page, a marketing site, or a sign-up flow.
 
 ```
 Build the Reporter route (/) using the existing Guardian Red design system and
-the central store. Optimize it so a frightened person gets help in under 10
-seconds, one-handed.
+the central store. Five screens in sequence. The Reporter is the LIGHT surface,
+except screen 1. Everything must work one-handed on a phone.
 
-SCREEN A — Report (the default view):
-- A calm headline "What's happening?" and one line of guidance:
-  "Tap once. Help is dispatched immediately. Details can come after."
-- SIX large category tiles in a 2x3 grid, each at least 100px tall, with a clear
-  icon and label: Fire, Medical, Crowd Crush, Accident, Violence, Other.
-- A single tap on a tile IMMEDIATELY submits the report. No confirmation dialog
-  and no second screen. Show a brief pressed state on the tapped tile.
-- Beneath the grid, a quiet status line for location:
-  "Location locked" / "Locating..." / "Location unavailable — choose a zone".
-  Only when unavailable, reveal a zone dropdown.
-- Fixed at the bottom, an emergency helpline strip: four tap-to-call buttons
-  linking to tel:112, tel:100, tel:101 and tel:102, labelled
-  112 ALL / 100 POLICE / 101 FIRE / 102 AMBULANCE.
+SCREEN 1 — HOME (the only dark screen):
+Dark cinematic background (#0A0A0C over a dimmed crowd photograph). Centered:
+the AEGIS shield mark, "AEGIS", and the subtitle "Smart Emergency Response
+System". Below it a large circular red SOS button, at least 190px across, with a
+soft red glow and a slow breathing pulse, labelled "SOS" over "REPORT EMERGENCY".
+Beneath the button a small pill: a location icon, "Location Access", and a green
+"Enabled" check. A caption underneath: "Your location helps us respond faster."
+Top bar has a menu icon on the left and a notification bell on the right.
+Tapping SOS goes to screen 2. Begin resolving GPS the moment this screen loads,
+never on submit.
 
-SCREEN B — Tracking (replaces Screen A after submitting):
-- A large reassuring status line driven by incident status, in this order:
-  "Analyzing your report..." -> "Verified. Finding the nearest responder..." ->
-  "Responder assigned" -> "Help is on the way" -> "Responder has arrived" ->
-  "Resolved. Stay safe."
-- A priority chip (P1 red, P2 amber, P3 and P4 green) plus the incident headline
-  and zone.
-- Once assigned, a responder card: role and unit code, a vehicle icon, and a
-  large ETA in minutes that updates live.
-- "While you wait" — the AI-retrieved guidance steps as a numbered checklist of
-  cards, with a small source caption underneath.
-- An OPTIONAL enrichment card, collapsed by default, titled "Add details
-  (optional)": a 140-character description field, a photo capture button, and a
-  callback number field, each with its own small save action. Caption it:
-  "Your report is already helping. Add these only if it's safe to."
-- A red "CALL 112" button that is always visible.
-- A quiet text link "Report something else" returning to Screen A.
+SCREEN 2 — REPORT EMERGENCY (light):
+Back chevron and the title "Report Emergency". Heading "What's happening?".
+A 3x2 grid of six category tiles with icon above label: Fire, Medical, Crowd,
+Accident, Violence, Other. The selected tile fills soft red #FDECEE with a red
+border and red label. Then:
+- "Location (Auto)" — a bordered field showing the resolved zone (for example
+  "Gate 3, Block B") with a pin icon and a re-locate button on the right. If GPS
+  is unavailable, turn this into a zone dropdown and say so plainly.
+- "Description (Optional)" — a textarea with a live character counter, max 150.
+- "Add Photo (Optional)" — a thumbnail preview beside a camera capture tile.
+- A full-width red "SUBMIT REPORT" button, enabled as soon as a category is
+  chosen. Never require the description or the photo.
+
+SCREEN 3 — REPORT SUBMITTING (light):
+A centered red shield mark inside concentric pulsing rings. "Report is
+submitting..." and "Please don't close the app." Below, a staged checklist that
+ticks green in order as the real status advances: Sending report, Verifying
+information, Analyzing incident, Finding nearest responders, Preparing response.
+The active row shows a spinner. A soft red footer card: "Help is on the way.
+Please stay calm."
+
+SCREEN 4 — TRACK REPORT (light), two states of one screen:
+Header "Track Report" with an info icon. A card showing "Incident ID" in red
+mono and "Status".
+(a) Awaiting assignment: status "Finding Responder" in amber with a spinner, a
+    centered illustration, "We are finding the nearest available responder." and
+    "This may take a few moments."
+(b) Assigned: status "Responder Assigned" in green with a check. A responder
+    card showing the unit name (for example "Fire Squad 12") with a vehicle icon,
+    and "ETA" as a large red number in minutes, updating live. Caption: "We've
+    assigned the nearest responder to your location." Then an outlined red
+    "VIEW LIVE TRACKING" button opening a map with the responder marker moving.
+Both states keep the footer card "Help is on the way. Stay calm and stay safe."
+
+SCREEN 5 — WHAT TO DO NEXT (light):
+Header "What to do next". A soft red banner showing the category with its icon,
+and "AI Severity: High (P1)" using the real priority. Heading "Follow these
+guidelines", then the AI-retrieved steps as cards, each with an icon on the left
+and the step text. A small caption naming the source document. At the bottom a
+full-width red "EMERGENCY HELPLINE" button that calls tel:112, plus a compact
+row of three smaller call buttons: 100 POLICE, 101 FIRE, 102 AMBULANCE.
+Use the real Indian emergency numbers, never a placeholder number.
 
 Use aria-live so status changes are announced to screen readers.
 ```
