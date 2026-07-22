@@ -295,7 +295,11 @@ RIGHT — detail panel from useDetail(selectedId):
    severity applied."
  - "RECOMMENDED ACTIONS": each string in sopSteps as a numbered row, with a small
    caption beneath reading sopSource.
- - Photos as thumbnails when present.
+ - "EVIDENCE FROM REPORTER": any URL in photos[] as a thumbnail that opens full
+   size in a new tab. Omit the whole block when there are no photos.
+ - "REPORTER CALLBACK": the first non-empty phone across reports[], rendered as
+   a green outlined tel: link the operator can tap to call. When no reporter
+   left a number, show the quiet line "Reporter left no callback number."
  - A red "DISPATCH NEAREST UNIT" calling dispatch(_id). Once assignedResponderId
    exists, hide it and show the assigned unit's code, role and status instead.
  - "MARK RESOLVED" calling resolve(_id).
