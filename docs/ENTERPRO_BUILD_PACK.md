@@ -1,6 +1,10 @@
 # AEGIS — EnterPro Build Pack (v4, FINAL)
 
-The one document to build the competition frontend. Supersedes `ENTERPRO_GUIDE.md`.
+Strategy, wiring code and guardrails for the competition frontend.
+
+> **The prompts you actually paste live in [`ENTERPRO_PROMPTS_READY.md`](ENTERPRO_PROMPTS_READY.md)** —
+> they are kept aligned with the real backend contract. Use those; this file is
+> the reasoning behind them plus the `aegis-backend.js` source in §7.
 
 **Rules this satisfies:** built with EnterPro ✅ · deployed via EnterPro ✅ · Convex is the real backend ✅ · one public URL to submit ✅ · same AEGIS project as the PPT round ✅
 
