@@ -192,8 +192,11 @@ border and red label. Then:
  - "Description (Optional)": textarea, live counter, max 150 chars.
  - "Add Photo (Optional)": thumbnail beside a camera capture tile; on selection
    call uploadPhoto(file) and hold the returned photoId.
+ - "Callback number (Optional)": a tel input, digits only, max 10, placeholder
+   "So the control room can call you back", with the caption "Skip this freely.
+   Your location is taken from GPS, never from this number."
  - Full-width red "SUBMIT REPORT", enabled the moment a category is chosen.
-   Never require description or photo.
+   Never require description, photo or phone.
 On submit call submitReport({category, description, phone, lat, lng, zone,
 photoId}), keep the returned incidentId, go to screen 3. If merged is true, show
 "Merged with nearby reports" on screen 4.
