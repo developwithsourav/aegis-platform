@@ -117,14 +117,33 @@ export async function uploadPhoto(file) {
   return storageId;
 }
 
+// High accuracy waits for a GPS fix and times out on most laptops, so retry
+// coarsely before giving up.
 export function getPosition() {
+  const ok = (resolve) => (p) => resolve({ lat: p.coords.latitude, lng: p.coords.longitude });
   return new Promise((resolve) => {
     if (!navigator.geolocation) return resolve(null);
-    navigator.geolocation.getCurrentPosition(
-      (p) => resolve({ lat: p.coords.latitude, lng: p.coords.longitude }),
-      () => resolve(null),
-      { timeout: 4000, enableHighAccuracy: true });
+    navigator.geolocation.getCurrentPosition(ok(resolve),
+      () => navigator.geolocation.getCurrentPosition(ok(resolve), () => resolve(null),
+        { timeout: 10000, maximumAge: 60000, enableHighAccuracy: false }),
+      { timeout: 6000, maximumAge: 30000, enableHighAccuracy: true });
   });
+}
+
+// Permission is often granted only after the first attempt already failed,
+// so watch for the change and re-request instead of showing "Off" forever.
+export function useGeo() {
+  const [pos, setPos] = useState(undefined);
+  const request = () => { setPos(undefined); getPosition().then(setPos); };
+  useEffect(() => {
+    request();
+    let perm;
+    navigator.permissions?.query({ name: "geolocation" })
+      .then((p) => { perm = p; p.onchange = () => { if (p.state === "granted") request(); }; })
+      .catch(() => {});
+    return () => { if (perm) perm.onchange = null; };
+  }, []);
+  return [pos, request];
 }
 
 export const displayId = (id) => "AEGIS-" + String(id).slice(-8).toUpperCase();
@@ -153,10 +172,14 @@ no decline action.
 SCREEN 1 HOME (the only dark screen): dark hero over a dimmed crowd photo.
 Centered AEGIS shield mark, "AEGIS", subtitle "Smart Emergency Response System".
 A circular red SOS button at least 190px across with a soft glow and slow
-breathing pulse, labelled "SOS" over "REPORT EMERGENCY". Below it a pill showing
-a location icon, "Location Access" and a green "Enabled" check reflecting the
-real permission state. Caption: "Your location helps us respond faster." Menu
-icon left, bell right. Call getPosition() on mount, never at submit time.
+breathing pulse, labelled "SOS" over "REPORT EMERGENCY". Below it a pill BUTTON showing a
+location icon, "Location Access", and the live state from useGeo(): "Locating…"
+while pending, a green "Enabled" once fixed, or an amber "Off — tap to retry"
+which re-requests when pressed. Caption reads "Your location helps us respond
+faster.", or when location is unavailable "You can still report — we'll ask for
+the zone instead." Menu icon left, bell right.
+Use useGeo() on mount, never request position at submit time. A failed or
+pending location must NEVER block reporting.
 
 SCREEN 2 REPORT EMERGENCY (light): back chevron, title "Report Emergency",
 heading "What's happening?". A 3x2 grid of six tiles, icon above label, mapping

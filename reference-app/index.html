@@ -332,13 +332,34 @@ async function uploadPhoto(file) {
   const { storageId } = await res.json();
   return storageId;
 }
+/* Two-stage, both learned the hard way: high accuracy waits for a GPS fix and
+   simply times out on most laptops, so fall back to a coarse wifi lookup before
+   giving up; and the timeout has to outlast a human deciding to tap Allow. */
 function getPosition() {
+  const ok = (resolve) => (p) => resolve({ lat: p.coords.latitude, lng: p.coords.longitude });
   return new Promise((resolve) => {
     if (!navigator.geolocation) return resolve(null);
-    navigator.geolocation.getCurrentPosition(
-      (p) => resolve({ lat: p.coords.latitude, lng: p.coords.longitude }),
-      () => resolve(null), { timeout: 4000, enableHighAccuracy: true });
+    navigator.geolocation.getCurrentPosition(ok(resolve),
+      () => navigator.geolocation.getCurrentPosition(ok(resolve), () => resolve(null),
+        { timeout: 10000, maximumAge: 60000, enableHighAccuracy: false }),
+      { timeout: 6000, maximumAge: 30000, enableHighAccuracy: true });
   });
+}
+
+/* Permission is often granted only after the first attempt already failed, so
+   watch for the change and re-request rather than leaving the pill on "Off". */
+function useGeo() {
+  const [pos, setPos] = useState(undefined);
+  const request = () => { setPos(undefined); getPosition().then(setPos); };
+  useEffect(() => {
+    request();
+    let perm;
+    navigator.permissions?.query({ name: "geolocation" })
+      .then((p) => { perm = p; p.onchange = () => { if (p.state === "granted") request(); }; })
+      .catch(() => {});
+    return () => { if (perm) perm.onchange = null; };
+  }, []);
+  return [pos, request];
 }
 const displayId = (id) => "AEGIS-" + String(id).slice(-8).toUpperCase();
 
@@ -409,7 +430,7 @@ function Reporter() {
   const [screen, setScreen] = useState("home");
   const [cat, setCat] = useState(null);
   const [desc, setDesc] = useState("");
-  const [pos, setPos] = useState(undefined);      // undefined = locating
+  const [pos, retryPos] = useGeo();               // undefined = locating, null = unavailable
   const [zone, setZone] = useState("");
   const [photo, setPhoto] = useState(null);
   const [photoId, setPhotoId] = useState(null);
@@ -419,7 +440,6 @@ function Reporter() {
   const venue = useVenue();
   const track = useTrack(incId);
 
-  useEffect(() => { getPosition().then(setPos); }, []);
   useEffect(() => {
     if (screen === "submitting" && track && track.status !== "ai_processing") setScreen("track");
   }, [track && track.status, screen]);
@@ -462,13 +482,16 @@ function Reporter() {
         <button class="sos" onClick=${() => setScreen("form")} aria-label="Report emergency">
           <b>SOS</b><span>REPORT EMERGENCY</span>
         </button>
-        <div class="pill">
+        <button class="pill" onClick=${retryPos} disabled=${pos === undefined}
+          aria-label="Location access status. Tap to retry.">
           <${Icon} d=${I.pin} s=${16} style=${{color:"var(--red)"}}/>
           Location Access
-          <span style=${{color:pos===null?"var(--amber)":"var(--green)",fontWeight:750}}>
-            ${pos === undefined ? "…" : pos === null ? "Off" : "Enabled"}</span>
-        </div>
-        <p class="cap">Your location helps us respond faster.</p>
+          <span style=${{color:pos===null?"var(--amber)":pos===undefined?"var(--dmut)":"var(--green)",fontWeight:750}}>
+            ${pos === undefined ? "Locating…" : pos === null ? "Off — tap to retry" : "Enabled"}</span>
+        </button>
+        <p class="cap">${pos === null
+          ? "You can still report — we'll ask for the zone instead."
+          : "Your location helps us respond faster."}</p>
       </div>
     </div>`;
 
@@ -500,7 +523,7 @@ function Reporter() {
             <div class="loc">
               <${Icon} d=${I.pin} s=${18} style=${{color:"var(--red)"}}/>
               <span class="txt">${zoneLabel}</span>
-              <button onClick=${() => { setPos(undefined); getPosition().then(setPos); }} aria-label="Re-locate">
+              <button onClick=${retryPos} aria-label="Re-locate">
                 <${Icon} d=${I.pin} s=${17} style=${{color:"var(--mut)"}}/></button>
             </div>`}
         </div>
