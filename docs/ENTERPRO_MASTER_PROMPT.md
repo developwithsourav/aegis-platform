@@ -65,10 +65,11 @@ hidden on Reporter). Directly beneath it, an announcement banner: when
 useBroadcast() returns a value, show a full-width amber bar with its message on
 every route; hidden otherwise.
 
-════════ STEP 1 — create src/aegis-backend.js with EXACTLY this ════════
+════════ STEP 1 — run `npm install convex`, then create src/aegis-backend.js
+         with EXACTLY this ════════
 // AEGIS -> live Convex backend. Real-time subscriptions, no polling.
-import { ConvexClient } from "https://esm.sh/convex@1.42.3/browser";
-import { anyApi } from "https://esm.sh/convex@1.42.3/server";
+import { ConvexClient } from "convex/browser";
+import { anyApi } from "convex/server";
 import { useEffect, useState } from "react";
 
 export const client = new ConvexClient("https://judicious-oyster-529.convex.cloud");
@@ -299,7 +300,18 @@ fully working against the live backend.
 5. Deploy on EnterPro. Reset data before pitching:
    `npx convex run seed:resetIncidents`
 
-**If the `esm.sh` imports fail**, only `src/aegis-backend.js` needs to change —
-swap it for REST calls against `https://judicious-oyster-529.convex.site` with a
-3 second poll. Every function has an endpoint; see `ENTERPRO_BUILD_PACK.md` §7.
-The UI does not change, because nothing else touches data.
+**If `npm install convex` is unavailable**, change only the two import lines in
+`src/aegis-backend.js` to the CDN build — the rest of the file is identical:
+
+```js
+import { ConvexClient } from "https://esm.sh/convex@1.42.3/browser";
+import { anyApi } from "https://esm.sh/convex@1.42.3/server";
+```
+
+Prefer the npm package: the CDN version fetches the client at runtime, so flaky
+venue wifi would break the app on stage.
+
+**If neither works**, swap that one file for REST calls against
+`https://judicious-oyster-529.convex.site` with a 3 second poll. Every function
+has an endpoint; see `ENTERPRO_BUILD_PACK.md` §7. The UI never changes, because
+nothing else touches data.
