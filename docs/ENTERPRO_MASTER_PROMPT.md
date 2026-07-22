@@ -88,12 +88,25 @@ export function useLive(fn, args = {}, enabled = true) {
   return data;
 }
 
-export const useBoard      = ()   => useLive(api.incidents.liveBoard);
-export const useBroadcast  = ()   => useLive(api.incidents.activeBroadcast);
-export const useResponders = ()   => useLive(api.incidents.respondersList);
-export const useVenue      = ()   => useLive(api.incidents.venueInfo);
-export const useTrack      = (id) => useLive(api.incidents.trackIncident, { incidentId: id }, !!id);
-export const useDetail     = (id) => useLive(api.incidents.incidentDetail, { incidentId: id }, !!id);
+// anyApi is a Proxy: every property access returns a NEW object. Passing
+// api.x.y straight into a hook makes the effect dependency change on each
+// render, so the subscription tears down and re-creates forever and the data
+// never settles. Resolve the references exactly once, here.
+const F = {
+  board:      api.incidents.liveBoard,
+  broadcast:  api.incidents.activeBroadcast,
+  responders: api.incidents.respondersList,
+  venue:      api.incidents.venueInfo,
+  track:      api.incidents.trackIncident,
+  detail:     api.incidents.incidentDetail,
+};
+
+export const useBoard      = ()   => useLive(F.board);
+export const useBroadcast  = ()   => useLive(F.broadcast);
+export const useResponders = ()   => useLive(F.responders);
+export const useVenue      = ()   => useLive(F.venue);
+export const useTrack      = (id) => useLive(F.track, { incidentId: id }, !!id);
+export const useDetail     = (id) => useLive(F.detail, { incidentId: id }, !!id);
 
 export const submitReport = (a)  => client.mutation(api.incidents.submitReport, a);
 export const dispatch     = (id) => client.mutation(api.incidents.dispatch, { incidentId: id });
@@ -190,6 +203,9 @@ border and red label. Then:
    pin icon and re-locate button. If position is null, show a dropdown of gate
    names from useVenue() and say location is unavailable.
  - "Description (Optional)": textarea, live counter, max 150 chars.
+ - "Callback number (Optional)": tel input, digits only, max 10, placeholder
+   "So the control room can call you back", with the caption "Only used to call
+   you back. Skip it — it never delays your report."
  - "Add Photo (Optional)": thumbnail beside a camera capture tile; on selection
    call uploadPhoto(file) and hold the returned photoId.
  - "Callback number (Optional)": a tel input, digits only, max 10, placeholder
@@ -288,6 +304,10 @@ red left border. P1 cards pulse slowly.
 RIGHT — detail panel from useDetail(selectedId):
  - Title row: category icon, headline, priority badge, status chip.
  - Meta row: reported time, "Reported by Anonymous", displayId.
+ - A "Reporter callback" card, shown ONLY when a number exists: take the first
+   truthy phone across detail.reports (a merged duplicate may carry it), and
+   render it as a tel: link with a "Tap to call" affordance, so the control room
+   can call back in one tap.
  - The summary text.
  - "AI SUGGESTION" panel captioned "Based on incident analysis": the summary and
    a confidence bar showing confidence as a percentage. If aiFailed is true,
