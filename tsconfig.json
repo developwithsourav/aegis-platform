@@ -1,7 +1,8 @@
 {
+  /* The backend lives in convex/, which carries its own tsconfig.
+     This root config only exists so editors and `tsc` resolve the project
+     cleanly. (It previously referenced tsconfig.app/node.json, left over from
+     the deleted Vite starter; those files do not exist.) */
   "files": [],
-  "references": [
-    { "path": "./tsconfig.app.json" },
-    { "path": "./tsconfig.node.json" }
-  ]
+  "references": [{ "path": "./convex" }]
 }
