@@ -62,6 +62,9 @@ http.route({ path: "/responder-location", method: "POST", handler: httpAction(as
 http.route({ path: "/login", method: "POST", handler: httpAction(async (ctx, req) =>
   json(await ctx.runQuery(api.incidents.login, await req.json())))});
 
+http.route({ path: "/responder-login", method: "POST", handler: httpAction(async (ctx, req) =>
+  json(await ctx.runQuery(api.incidents.responderLogin, await req.json())))});
+
 http.route({ path: "/broadcast", method: "GET", handler: httpAction(async (ctx) =>
   json(await ctx.runQuery(api.incidents.activeBroadcast, {})))});
 
@@ -74,7 +77,7 @@ http.route({ path: "/broadcast-clear", method: "POST", handler: httpAction(async
 // CORS preflight for every POST route above.
 for (const path of [
   "/report", "/upload-url", "/dispatch", "/accept", "/on-scene", "/resolve",
-  "/responder-location", "/login", "/broadcast", "/broadcast-clear",
+  "/responder-location", "/login", "/responder-login", "/broadcast", "/broadcast-clear",
 ])
   http.route({ path, method: "OPTIONS", handler: httpAction(async () =>
     new Response(null, { status: 204, headers: cors })) });

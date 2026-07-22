@@ -236,6 +236,20 @@ export const login = query({
   },
 });
 
+/* Responder devices share one venue passcode. Same fail-closed rule as the
+   operator login: no RESPONDER_PASSCODE configured means nobody gets in.
+   This gates the UI, not the API — real deployments would use Convex Auth with
+   role-scoped functions. It exists so a public demo URL cannot be interfered
+   with by anyone who happens to have the link. */
+export const responderLogin = query({
+  args: { passcode: v.string() },
+  handler: async (_ctx, { passcode }) => {
+    const expected = process.env.RESPONDER_PASSCODE;
+    if (!expected) return { ok: false };
+    return passcode === expected ? { ok: true } : { ok: false };
+  },
+});
+
 // ---------- live queries ----------
 export const liveBoard = query({
   args: {},
