@@ -491,7 +491,7 @@ function Reporter() {
           <span class="lbl">Location <span style="text-transform:none;letter-spacing:0">(Auto)</span></span>
           ${pos === null ? html`
             <select class="inp" value=${zone} onChange=${(e) => setZone(e.target.value)}>
-              <option value="">Select a zone…</option>
+              <option key="_none" value="">Select a zone…</option>
               ${(venue ? venue.gates : []).map((g) => html`<option key=${g.name} value=${g.name}>${g.name}</option>`)}
             </select>
             ${!zone && html`<div class="counter" style="text-align:left;color:var(--amber)">

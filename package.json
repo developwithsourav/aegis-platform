@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "convex dev",
     "seed": "convex run seed:all",
+    "embed": "convex run ai:embedAllSops",
     "reset": "convex run seed:resetIncidents",
     "harness": "python -m http.server 4300 --directory harness",
     "app": "python -m http.server 4320 --directory reference-app"
