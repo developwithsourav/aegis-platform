@@ -1,0 +1,962 @@
+<!doctype html>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>AEGIS — Emergency Response</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text y='26' font-size='26'>🛡</text></svg>">
+<style>
+/* ============ Guardian Red design system ============ */
+:root{
+  /* public / light surface */
+  --bg:#FFFFFF; --panel:#F7F8FA; --line:#E8E9EC; --ink:#0A0A0C; --mut:#6B6C72;
+  --red:#E11D2E; --red-d:#B3121F; --softred:#FDECEE;
+  --green:#22C55E; --amber:#F59E0B;
+  /* operational / dark surface */
+  --dbg:#0A0A0C; --dsurf:#141417; --dcard:#1B1B1F; --dline:#2A2A30;
+  --dink:#F5F5F6; --dmut:#8E8E96;
+  /* roles */
+  --r-fire:#E11D2E; --r-medic:#22C55E; --r-marshal:#F59E0B; --r-security:#A855F7;
+  --radius:14px;
+  --font:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif;
+  --mono:ui-monospace,'SF Mono',Menlo,Consolas,monospace;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{font-family:var(--font);background:var(--dbg);color:var(--ink);
+  -webkit-font-smoothing:antialiased;font-size:15px;line-height:1.5}
+button{font:inherit;cursor:pointer;border:0;background:none;color:inherit}
+input,textarea,select{font:inherit;color:inherit}
+a{color:inherit}
+:focus-visible{outline:2px solid var(--red);outline-offset:2px;border-radius:6px}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+
+/* ============ shell ============ */
+#root{min-height:100dvh;display:flex;flex-direction:column}
+.surface-light{background:var(--bg);color:var(--ink)}
+.surface-dark{background:var(--dbg);color:var(--dink)}
+.app{flex:1;display:flex;flex-direction:column;min-height:100dvh}
+
+.topbar{display:flex;align-items:center;gap:10px;padding:11px 16px;
+  border-bottom:1px solid var(--dline);background:var(--dsurf);color:var(--dink);
+  flex-shrink:0}
+.topbar.light{background:var(--bg);border-color:var(--line);color:var(--ink)}
+.wordmark{font-weight:800;letter-spacing:.22em;font-size:14px}
+.livedot{width:9px;height:9px;border-radius:50%;background:var(--red);
+  animation:breathe 2.4s ease-in-out infinite;flex-shrink:0}
+@keyframes breathe{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.45;transform:scale(.82)}}
+.topbar .right{margin-left:auto;display:flex;align-items:center;gap:12px;
+  font-size:12px;color:var(--dmut);font-variant-numeric:tabular-nums}
+.topbar.light .right{color:var(--mut)}
+.conn{display:flex;align-items:center;gap:6px}
+.conn i{width:7px;height:7px;border-radius:50%;background:var(--green);display:block}
+.conn.off i{background:var(--amber)}
+
+.banner{background:var(--amber);color:#231400;padding:11px 16px;font-weight:650;
+  font-size:14px;display:flex;gap:9px;align-items:center;flex-shrink:0}
+
+/* ============ generic ============ */
+.wrap{width:100%;max-width:520px;margin:0 auto;padding:20px 18px 40px;flex:1}
+.chip{display:inline-flex;align-items:center;gap:5px;font-size:10.5px;font-weight:800;
+  letter-spacing:.09em;text-transform:uppercase;padding:4px 9px;border-radius:7px}
+.p1{background:var(--red);color:#fff}
+.p2{background:var(--amber);color:#231400}
+.p3,.p4{background:var(--green);color:#04240f}
+.pill{display:inline-flex;align-items:center;gap:7px;padding:8px 14px;border-radius:99px;
+  border:1px solid var(--line);background:var(--panel);font-size:13px;font-weight:600}
+.btn{display:flex;align-items:center;justify-content:center;gap:9px;width:100%;
+  min-height:52px;border-radius:var(--radius);background:var(--red);color:#fff;
+  font-weight:750;letter-spacing:.03em;transition:transform .15s,filter .15s}
+.btn:hover{filter:brightness(1.08)}.btn:active{transform:scale(.985)}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.btn.ghost{background:transparent;border:1.5px solid var(--red);color:var(--red)}
+.btn.green{background:var(--green);color:#04240f}
+.btn.sm{min-height:42px;font-size:13.5px;border-radius:10px}
+.card{border:1px solid var(--line);border-radius:var(--radius);padding:16px;background:var(--bg)}
+.muted{color:var(--mut);font-size:13px}
+.mono{font-family:var(--mono);font-variant-numeric:tabular-nums}
+.lbl{font-size:11px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:var(--mut)}
+.center{text-align:center}
+
+/* ============ reporter: home (dark hero) ============ */
+.hero{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  gap:26px;padding:36px 22px 44px;text-align:center;color:var(--dink);position:relative;
+  background:
+    radial-gradient(120% 80% at 50% 0%, #241016 0%, transparent 60%),
+    radial-gradient(90% 60% at 50% 100%, #2a0d13 0%, transparent 65%),
+    var(--dbg);
+  overflow:hidden}
+.hero::before{content:"";position:absolute;inset:0;opacity:.16;
+  background-image:repeating-linear-gradient(115deg,#fff 0 1px,transparent 1px 26px);
+  mask-image:radial-gradient(70% 55% at 50% 62%,#000 0%,transparent 75%)}
+.hero>*{position:relative}
+.shield{width:64px;height:64px}
+.hero h1{font-size:34px;letter-spacing:.18em;font-weight:800}
+.hero .sub{color:var(--dmut);font-size:14.5px;margin-top:-14px;max-width:230px}
+.sos{width:206px;height:206px;border-radius:50%;background:radial-gradient(circle at 50% 38%,#F0323F,var(--red) 55%,var(--red-d));
+  color:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;
+  box-shadow:0 0 0 12px rgba(225,29,46,.13),0 0 64px rgba(225,29,46,.42);
+  animation:sospulse 2.8s ease-in-out infinite;transition:transform .15s}
+.sos:active{transform:scale(.96)}
+.sos b{font-size:44px;letter-spacing:.06em;line-height:1}
+.sos span{font-size:11.5px;font-weight:750;letter-spacing:.13em;opacity:.93}
+@keyframes sospulse{0%,100%{box-shadow:0 0 0 12px rgba(225,29,46,.13),0 0 64px rgba(225,29,46,.42)}
+  50%{box-shadow:0 0 0 22px rgba(225,29,46,.05),0 0 88px rgba(225,29,46,.55)}}
+.hero .pill{background:rgba(255,255,255,.05);border-color:var(--dline);color:var(--dink)}
+.hero .cap{color:var(--dmut);font-size:12.5px}
+
+/* ============ reporter: form ============ */
+.navbar{display:flex;align-items:center;gap:12px;padding:14px 18px;border-bottom:1px solid var(--line);
+  background:var(--bg);position:sticky;top:0;z-index:5}
+.navbar b{font-size:16px;font-weight:700}
+.navbar button{width:34px;height:34px;display:grid;place-items:center;border-radius:9px}
+.h2{font-size:21px;font-weight:750;margin:6px 0 16px}
+.cats{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:22px}
+.cat{border:1.5px solid var(--line);border-radius:13px;padding:15px 6px 12px;background:var(--bg);
+  display:flex;flex-direction:column;align-items:center;gap:9px;font-size:12.5px;font-weight:650;
+  color:var(--mut);transition:all .15s;min-height:92px;justify-content:center}
+.cat svg{width:25px;height:25px}
+.cat:hover{border-color:#d3d5da}
+.cat.on{background:var(--softred);border-color:var(--red);color:var(--red)}
+.field{margin-bottom:17px}
+.field>.lbl{display:block;margin-bottom:7px}
+.inp{width:100%;border:1.5px solid var(--line);border-radius:11px;padding:13px 14px;
+  background:var(--bg);font-size:14.5px;transition:border-color .15s}
+.inp:focus{border-color:var(--red);outline:none}
+textarea.inp{resize:none;min-height:82px}
+.loc{display:flex;align-items:center;gap:10px;border:1.5px solid var(--line);border-radius:11px;
+  padding:12px 13px}
+.loc .txt{flex:1;font-size:14px;font-weight:600}
+.counter{font-size:11.5px;color:var(--mut);text-align:right;margin-top:5px}
+.photorow{display:flex;gap:11px}
+.photobtn{width:96px;height:76px;border:1.5px dashed var(--line);border-radius:11px;
+  display:grid;place-items:center;color:var(--mut);background:var(--panel)}
+.photorow img{width:96px;height:76px;object-fit:cover;border-radius:11px;border:1px solid var(--line)}
+
+/* ============ reporter: submitting ============ */
+.rings{width:132px;height:132px;margin:14px auto 22px;position:relative;display:grid;place-items:center}
+.rings i{position:absolute;border-radius:50%;border:1.5px solid var(--red);opacity:0;
+  animation:ripple 2.6s ease-out infinite}
+.rings i:nth-child(2){animation-delay:.85s}.rings i:nth-child(3){animation-delay:1.7s}
+@keyframes ripple{0%{width:56px;height:56px;opacity:.55}100%{width:132px;height:132px;opacity:0}}
+.rings .core{width:58px;height:58px;border-radius:50%;background:var(--softred);
+  display:grid;place-items:center;position:relative}
+.steps{border:1px solid var(--line);border-radius:var(--radius);overflow:hidden}
+.step{display:flex;align-items:center;gap:12px;padding:13px 15px;font-size:14px;font-weight:600;
+  border-bottom:1px solid var(--line);color:var(--mut)}
+.step:last-child{border-bottom:0}
+.step.done{color:var(--ink)}
+.step.now{color:var(--ink);background:var(--panel)}
+.dot{width:19px;height:19px;border-radius:50%;border:2px solid var(--line);flex-shrink:0;
+  display:grid;place-items:center}
+.step.done .dot{background:var(--green);border-color:var(--green)}
+.step.now .dot{border-color:var(--red);border-right-color:transparent;animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.reassure{background:var(--softred);border-radius:var(--radius);padding:14px 16px;margin-top:18px;
+  display:flex;gap:11px;align-items:center;font-size:13.5px;font-weight:600;color:var(--red-d)}
+
+/* ============ reporter: track ============ */
+.idcard{border:1px solid var(--line);border-radius:var(--radius);padding:15px 16px;
+  display:flex;justify-content:space-between;gap:14px;margin-bottom:16px}
+.idcard .v{font-weight:750;font-size:15px;margin-top:3px}
+.idcard .v.red{color:var(--red);font-family:var(--mono)}
+.respcard{border:1px solid var(--line);border-radius:var(--radius);padding:17px;margin-bottom:14px}
+.respcard .top{display:flex;justify-content:space-between;align-items:flex-start}
+.respcard .name{font-size:18px;font-weight:750;margin-top:4px}
+.eta{font-size:34px;font-weight:800;color:var(--red);line-height:1;font-variant-numeric:tabular-nums}
+.emptyart{padding:34px 0;text-align:center}
+.sop{display:flex;gap:13px;border:1px solid var(--line);border-radius:12px;padding:14px;
+  margin-bottom:9px;align-items:flex-start;font-size:14px;line-height:1.5}
+.sop .n{width:25px;height:25px;border-radius:8px;background:var(--softred);color:var(--red);
+  display:grid;place-items:center;font-weight:800;font-size:12.5px;flex-shrink:0}
+.helprow{display:grid;grid-template-columns:repeat(3,1fr);gap:9px;margin-top:11px}
+.helprow a{border:1px solid var(--line);border-radius:11px;padding:11px 4px;text-align:center;
+  font-size:11.5px;font-weight:750;text-decoration:none;color:var(--mut)}
+.sevbanner{background:var(--softred);border-radius:var(--radius);padding:16px;margin-bottom:20px;
+  display:flex;gap:13px;align-items:center}
+.sevbanner .t{font-weight:750;font-size:16px;color:var(--red)}
+
+/* ============ dark routes (responder / command) ============ */
+.d{background:var(--dbg);color:var(--dink);flex:1;display:flex;flex-direction:column}
+.d .card,.d .inp,.d .steps,.d .sop,.d .idcard,.d .respcard{background:var(--dcard);border-color:var(--dline)}
+.d .muted,.d .lbl{color:var(--dmut)}
+.gate{max-width:380px;margin:auto;padding:28px 22px;width:100%}
+.gate .card{padding:26px 22px}
+.gate h3{font-size:19px;font-weight:750;margin-bottom:5px}
+.err{color:var(--red);font-size:13px;font-weight:650;margin-top:11px}
+.rolebadge{display:inline-flex;align-items:center;gap:6px;font-size:11px;font-weight:800;
+  letter-spacing:.08em;text-transform:uppercase;padding:4px 10px;border-radius:7px;
+  border:1px solid currentColor}
+.standby{text-align:center;padding:52px 20px}
+.standby .big{font-size:22px;font-weight:750;margin:16px 0 7px}
+.assign{border:1px solid var(--dline);border-radius:var(--radius);padding:18px;background:var(--dcard)}
+.assign h3{font-size:19px;font-weight:750;margin:9px 0 5px}
+.metrow{display:flex;gap:22px;margin:15px 0;padding:14px 0;border-top:1px solid var(--dline);
+  border-bottom:1px solid var(--dline)}
+.metrow div{flex:1}.metrow .v{font-size:19px;font-weight:750;margin-top:3px}
+.toggle{display:flex;align-items:center;gap:10px;margin-top:16px;font-size:13px;color:var(--dmut)}
+.toggle input{width:38px;height:21px;appearance:none;background:var(--dline);border-radius:99px;
+  position:relative;transition:background .2s;cursor:pointer;flex-shrink:0}
+.toggle input::after{content:"";position:absolute;top:2.5px;left:3px;width:16px;height:16px;
+  border-radius:50%;background:#fff;transition:transform .2s}
+.toggle input:checked{background:var(--red)}
+.toggle input:checked::after{transform:translateX(16px)}
+
+/* ============ command ============ */
+.cmdwrap{flex:1;display:flex;flex-direction:column;padding:16px;gap:14px;max-width:1560px;
+  margin:0 auto;width:100%}
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+.stat{border:1px solid var(--dline);border-radius:var(--radius);padding:15px 16px;background:var(--dcard)}
+.stat .n{font-size:31px;font-weight:800;line-height:1;font-variant-numeric:tabular-nums}
+.stat .l{font-size:11.5px;color:var(--dmut);margin-top:7px;font-weight:600}
+.stat.crit{border-color:var(--red);background:rgba(225,29,46,.09);animation:critpulse 2.2s ease-in-out infinite}
+.stat.crit .n{color:var(--red)}
+@keyframes critpulse{0%,100%{border-color:rgba(225,29,46,.85)}50%{border-color:rgba(225,29,46,.25)}}
+.cols{display:grid;grid-template-columns:1.25fr .95fr 1.15fr;gap:14px;align-items:start}
+@media(max-width:1000px){.cols{grid-template-columns:1fr}.stats{grid-template-columns:repeat(2,1fr)}}
+.panel{border:1px solid var(--dline);border-radius:var(--radius);background:var(--dcard);overflow:hidden}
+.panel>.hd{padding:12px 15px;border-bottom:1px solid var(--dline);display:flex;
+  align-items:center;justify-content:space-between}
+.panel>.bd{padding:14px 15px}
+.map{aspect-ratio:16/11;background:#0E0E11;position:relative;overflow:hidden}
+.map svg{width:100%;height:100%;display:block}
+table{width:100%;border-collapse:collapse;font-size:12.5px}
+th{text-align:left;padding:9px 15px;color:var(--dmut);font-size:10.5px;font-weight:800;
+  letter-spacing:.09em;text-transform:uppercase;border-bottom:1px solid var(--dline)}
+td{padding:10px 15px;border-bottom:1px solid var(--dline)}
+tr:last-child td{border-bottom:0}
+.q{display:block;width:100%;text-align:left;font:inherit;color:inherit;
+  border:1px solid var(--dline);border-left:3px solid var(--dline);border-radius:11px;
+  padding:13px 14px;margin-bottom:9px;cursor:pointer;transition:border-color .15s,background .15s;
+  background:var(--dcard)}
+.q:hover{background:#202024}
+.q.sel{border-left-color:var(--red);background:#212126}
+.q.crit{animation:critline 2.2s ease-in-out infinite}
+@keyframes critline{0%,100%{border-left-color:var(--red)}50%{border-left-color:rgba(225,29,46,.3)}}
+.q .hl{font-weight:700;font-size:14.5px;margin:7px 0 5px}
+.q .meta{font-size:11.5px;color:var(--dmut);display:flex;gap:9px;flex-wrap:wrap}
+.confbar{height:5px;border-radius:99px;background:var(--dline);overflow:hidden;margin-top:8px}
+.confbar i{display:block;height:100%;background:var(--red);border-radius:99px;transition:width .4s}
+.aipanel{border:1px solid var(--dline);border-radius:12px;padding:14px;background:#17171B;margin-bottom:14px}
+.aipanel.fail{border-color:var(--amber);background:rgba(245,158,11,.08)}
+.feed{max-height:210px;overflow-y:auto;font-size:12.5px}
+.feed div{display:flex;gap:11px;padding:7px 0;border-bottom:1px solid var(--dline);color:var(--dmut)}
+.feed div:last-child{border-bottom:0}
+.feed time{font-family:var(--mono);font-size:11px;flex-shrink:0;opacity:.8}
+.tmpl{display:flex;gap:7px;flex-wrap:wrap;margin:9px 0}
+.tmpl button{font-size:11.5px;padding:6px 11px;border-radius:99px;border:1px solid var(--dline);
+  color:var(--dmut)}
+.tmpl button:hover{border-color:var(--red);color:var(--red)}
+.side{display:flex;flex-direction:column;gap:3px}
+.side a{padding:9px 13px;border-radius:9px;font-size:13px;color:var(--dmut);font-weight:600;
+  display:flex;gap:10px;align-items:center;text-decoration:none}
+.side a.on{background:rgba(225,29,46,.12);color:var(--red)}
+.cmdhead{display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+.cmdhead h2{font-size:17px;font-weight:750;letter-spacing:.02em}
+.spacer{flex:1}
+</style>
+
+<div id="root"></div>
+
+<script type="module">
+import React, { useState, useEffect, useMemo } from "https://esm.sh/react@18.3.1";
+import { createRoot } from "https://esm.sh/react-dom@18.3.1/client?deps=react@18.3.1";
+import htm from "https://esm.sh/htm@3.1.1";
+import { ConvexClient } from "https://esm.sh/convex@1.42.3/browser";
+import { anyApi } from "https://esm.sh/convex@1.42.3/server";
+
+/* htm hands props through verbatim, but React wants a style OBJECT and
+   className rather than class. Normalise once here instead of at every call
+   site, so markup can stay plain HTML-shaped. */
+const styleObj = (s) => Object.fromEntries(
+  s.split(";").filter((r) => r.trim()).map((r) => {
+    const i = r.indexOf(":");
+    return [r.slice(0, i).trim().replace(/-([a-z])/g, (_, c) => c.toUpperCase()), r.slice(i + 1).trim()];
+  }));
+const h = (type, props, ...kids) => {
+  if (props) {
+    if (typeof props.style === "string") props.style = styleObj(props.style);
+    if (props.class !== undefined) { props.className = props.class; delete props.class; }
+  }
+  return React.createElement(type, props, ...kids);
+};
+const html = htm.bind(h);
+
+/* ═══════════ backend adapter — the ONLY place that touches data ═══════════ */
+const CONVEX_URL = "https://judicious-oyster-529.convex.cloud";
+const client = new ConvexClient(CONVEX_URL);
+const api = anyApi;
+
+function useLive(fn, args = {}, enabled = true) {
+  const [data, setData] = useState(undefined);
+  const key = JSON.stringify(args);
+  useEffect(() => {
+    if (!enabled) return;
+    const unsub = client.onUpdate(fn, args, setData);
+    return () => unsub();
+  }, [fn, key, enabled]);
+  return data;
+}
+/* anyApi is a Proxy: every property access returns a fresh object, so passing
+   api.x.y straight into a hook makes the effect dependency change on each
+   render and the subscription tears down and re-creates forever. Resolve the
+   references once, here. */
+const F = {
+  board:      api.incidents.liveBoard,
+  broadcast:  api.incidents.activeBroadcast,
+  responders: api.incidents.respondersList,
+  venue:      api.incidents.venueInfo,
+  track:      api.incidents.trackIncident,
+  detail:     api.incidents.incidentDetail,
+};
+const useBoard      = ()   => useLive(F.board);
+const useBroadcast  = ()   => useLive(F.broadcast);
+const useResponders = ()   => useLive(F.responders);
+const useVenue      = ()   => useLive(F.venue);
+const useTrack      = (id) => useLive(F.track, { incidentId: id }, !!id);
+const useDetail     = (id) => useLive(F.detail, { incidentId: id }, !!id);
+
+const submitReport = (a)  => client.mutation(api.incidents.submitReport, a);
+const dispatchUnit = (id) => client.mutation(api.incidents.dispatch, { incidentId: id });
+const accept       = (id) => client.mutation(api.incidents.acceptAssignment, { incidentId: id });
+const onScene      = (id) => client.mutation(api.incidents.markOnScene, { incidentId: id });
+const resolveInc   = (id) => client.mutation(api.incidents.resolve, { incidentId: id });
+const sendBroadcast  = (message) => client.mutation(api.incidents.sendBroadcast, { message });
+const clearBroadcast = ()        => client.mutation(api.incidents.clearBroadcast, {});
+const moveResponder  = (responderId, lat, lng) =>
+  client.mutation(api.incidents.updateResponderLocation, { responderId, lat, lng });
+const login = (email, password) => client.query(api.incidents.login, { email, password });
+const responderLogin = (passcode) => client.query(api.incidents.responderLogin, { passcode });
+
+async function uploadPhoto(file) {
+  const url = await client.mutation(api.incidents.generateUploadUrl, {});
+  const res = await fetch(url, { method: "POST", headers: { "Content-Type": file.type }, body: file });
+  const { storageId } = await res.json();
+  return storageId;
+}
+function getPosition() {
+  return new Promise((resolve) => {
+    if (!navigator.geolocation) return resolve(null);
+    navigator.geolocation.getCurrentPosition(
+      (p) => resolve({ lat: p.coords.latitude, lng: p.coords.longitude }),
+      () => resolve(null), { timeout: 4000, enableHighAccuracy: true });
+  });
+}
+const displayId = (id) => "AEGIS-" + String(id).slice(-8).toUpperCase();
+
+/* ═══════════ labels ═══════════ */
+const CATS = [
+  ["fire","Fire"],["medical","Medical"],["crowd","Crowd"],
+  ["accident_infra","Accident"],["violence_security","Violence"],["other","Other"],
+];
+const CAT_LABEL = Object.fromEntries(CATS);
+const PRIO = { 1:"Critical", 2:"Urgent", 3:"Standard", 4:"Logged" };
+const ROLE_LABEL = { fire:"Fire Squad", medic:"Medic Team", marshal:"Marshal", security:"Security" };
+const ROLE_COLOR = { fire:"var(--r-fire)", medic:"var(--r-medic)", marshal:"var(--r-marshal)", security:"var(--r-security)" };
+const STATUS_TEXT = {
+  ai_processing:"Analyzing your report…", verified:"Verified. Finding the nearest responder…",
+  dispatched:"Responder assigned", en_route:"Help is on the way",
+  on_scene:"Responder has arrived", resolved:"Resolved. Stay safe.",
+};
+const time = (t) => new Date(t).toLocaleTimeString([], { hour:"2-digit", minute:"2-digit" });
+
+/* ═══════════ icons ═══════════ */
+const I = {
+  shield:  "M12 2 4 5.5v6c0 5 3.4 9.3 8 10.5 4.6-1.2 8-5.5 8-10.5v-6L12 2Z",
+  fire:    "M12 2c1 4-3 5-3 8a3 3 0 0 0 6 0c0-1 2 1.5 2 4a7 7 0 1 1-14 0C3 8 10 8 12 2Z",
+  medical: "M9 3h6v6h6v6h-6v6H9v-6H3V9h6V3Z",
+  crowd:   "M7 11a3 3 0 1 0 0-6 3 3 0 0 0 0 6Zm10 0a3 3 0 1 0 0-6 3 3 0 0 0 0 6ZM2 20a5 5 0 0 1 10 0M12 20a5 5 0 0 1 10 0",
+  accident:"M4 16h16M6 16l1.6-5.3A2 2 0 0 1 9.5 9h5a2 2 0 0 1 1.9 1.7L18 16M7 19v-3M17 19v-3",
+  violence:"M12 3 4 6v5.5c0 4.6 3.2 8.7 8 9.5 4.8-.8 8-4.9 8-9.5V6l-8-3Zm-2.5 7 5 5m0-5-5 5",
+  other:   "M6 12h.01M12 12h.01M18 12h.01",
+  pin:     "M12 21s7-5.7 7-11a7 7 0 1 0-14 0c0 5.3 7 11 7 11Zm0-8.5a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5Z",
+  check:   "m4.5 12.5 5 5 10-11",
+  phone:   "M4 5c0 8.3 6.7 15 15 15l2-3.5-4.5-2.5-2 2A13.5 13.5 0 0 1 8 9.5l2-2L7.5 3 4 5Z",
+  cam:     "M4 8h3l1.5-2h7L17 8h3v11H4V8Zm8 8.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7Z",
+  back:    "m14.5 5-7 7 7 7",
+  bell:    "M6 9a6 6 0 1 1 12 0c0 4 1.5 6 1.5 6h-15S6 13 6 9Zm3.5 9a2.5 2.5 0 0 0 5 0",
+  menu:    "M4 7h16M4 12h16M4 17h16",
+  truck:   "M2 16V7h11v9M13 10h4l3 3v3M6.5 19a1.8 1.8 0 1 0 0-3.6 1.8 1.8 0 0 0 0 3.6Zm10 0a1.8 1.8 0 1 0 0-3.6 1.8 1.8 0 0 0 0 3.6Z",
+  info:    "M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18Zm0-13v.5m0 3.5v5",
+  run:     "M13 5a1.6 1.6 0 1 0 0-3.2A1.6 1.6 0 0 0 13 5Zm-1 3-3.5 2L7 14m5-6 3 2 .5 4M12 8l-1 5 3.5 3 .5 5M11 13l-4 2-1 4",
+};
+const Icon = ({ d, s = 20, w = 1.9, fill = "none", ...p }) => html`
+  <svg viewBox="0 0 24 24" width=${s} height=${s} fill=${fill} stroke="currentColor"
+       strokeWidth=${w} strokeLinecap="round" strokeLinejoin="round" ...${p}>
+    <path d=${d}/></svg>`;
+const CatIcon = ({ c, s }) => html`<${Icon} d=${I[{fire:"fire",medical:"medical",crowd:"crowd",
+  accident_infra:"accident",violence_security:"violence",other:"other"}[c]] || I.other} s=${s}/>`;
+
+/* ═══════════ shell ═══════════ */
+function Shell({ light, clock, children }) {
+  const b = useBroadcast();
+  const [now, setNow] = useState(new Date());
+  useEffect(() => { const t = setInterval(() => setNow(new Date()), 1000); return () => clearInterval(t); }, []);
+  return html`
+    <div class=${"app " + (light ? "surface-light" : "surface-dark")}>
+      <div class=${"topbar" + (light ? " light" : "")}>
+        <span class="livedot"></span><span class="wordmark">AEGIS</span>
+        <div class="right">
+          <span class="conn"><i></i>Live</span>
+          ${clock && html`<span class="mono">${now.toLocaleTimeString()}</span>`}
+        </div>
+      </div>
+      ${b && html`<div class="banner"><${Icon} d=${I.bell} s=${17}/><span>${b.message}</span></div>`}
+      ${children}
+    </div>`;
+}
+
+/* ═══════════ ROUTE / — REPORTER ═══════════ */
+function Reporter() {
+  const [screen, setScreen] = useState("home");
+  const [cat, setCat] = useState(null);
+  const [desc, setDesc] = useState("");
+  const [pos, setPos] = useState(undefined);      // undefined = locating
+  const [zone, setZone] = useState("");
+  const [photo, setPhoto] = useState(null);
+  const [photoId, setPhotoId] = useState(null);
+  const [incId, setIncId] = useState(null);
+  const [merged, setMerged] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const venue = useVenue();
+  const track = useTrack(incId);
+
+  useEffect(() => { getPosition().then(setPos); }, []);
+  useEffect(() => {
+    if (screen === "submitting" && track && track.status !== "ai_processing") setScreen("track");
+  }, [track && track.status, screen]);
+
+  const zoneLabel = useMemo(() => {
+    if (pos === undefined) return "Locating…";
+    if (pos === null) return zone || "Choose a zone";
+    if (!venue) return "Locating…";
+    let best = null, bd = Infinity;
+    for (const g of venue.gates) {
+      const d = (g.lat - pos.lat) ** 2 + (g.lng - pos.lng) ** 2;
+      if (d < bd) { bd = d; best = g.name; }
+    }
+    return "Near " + best;
+  }, [pos, venue, zone]);
+
+  async function send() {
+    setBusy(true);
+    const r = await submitReport({
+      category: cat, description: desc || undefined,
+      lat: pos ? pos.lat : undefined, lng: pos ? pos.lng : undefined,
+      zone: pos ? undefined : (zone || undefined), photoId: photoId || undefined,
+    });
+    setIncId(r.incidentId); setMerged(r.merged); setBusy(false); setScreen("submitting");
+  }
+
+  /* ---- 1. HOME (dark) ---- */
+  if (screen === "home") return html`
+    <div class="app surface-dark">
+      <div class="topbar">
+        <button aria-label="Menu"><${Icon} d=${I.menu} s=${20}/></button>
+        <span class="wordmark" style="margin-left:2px">AEGIS</span>
+        <div class="right"><button aria-label="Notifications"><${Icon} d=${I.bell} s=${19}/></button></div>
+      </div>
+      <${BroadcastBar}/>
+      <div class="hero">
+        <${Icon} d=${I.shield} s=${62} w=${1.4} class="shield" style=${{color:"var(--red)"}}/>
+        <h1>AEGIS</h1>
+        <p class="sub">Smart Emergency Response System</p>
+        <button class="sos" onClick=${() => setScreen("form")} aria-label="Report emergency">
+          <b>SOS</b><span>REPORT EMERGENCY</span>
+        </button>
+        <div class="pill">
+          <${Icon} d=${I.pin} s=${16} style=${{color:"var(--red)"}}/>
+          Location Access
+          <span style=${{color:pos===null?"var(--amber)":"var(--green)",fontWeight:750}}>
+            ${pos === undefined ? "…" : pos === null ? "Off" : "Enabled"}</span>
+        </div>
+        <p class="cap">Your location helps us respond faster.</p>
+      </div>
+    </div>`;
+
+  /* ---- 2. FORM ---- */
+  if (screen === "form") return html`
+    <${Shell} light=${true}>
+      <div class="navbar">
+        <button onClick=${() => setScreen("home")} aria-label="Back"><${Icon} d=${I.back}/></button>
+        <b>Report Emergency</b>
+      </div>
+      <div class="wrap">
+        <h2 class="h2">What's happening?</h2>
+        <div class="cats">
+          ${CATS.map(([k, label]) => html`
+            <button key=${k} class=${"cat" + (cat === k ? " on" : "")} onClick=${() => setCat(k)}>
+              <${CatIcon} c=${k} s=${25}/>${label}
+            </button>`)}
+        </div>
+        <div class="field">
+          <span class="lbl">Location <span style="text-transform:none;letter-spacing:0">(Auto)</span></span>
+          ${pos === null ? html`
+            <select class="inp" value=${zone} onChange=${(e) => setZone(e.target.value)}>
+              <option value="">Select a zone…</option>
+              ${(venue ? venue.gates : []).map((g) => html`<option key=${g.name} value=${g.name}>${g.name}</option>`)}
+            </select>
+            ${!zone && html`<div class="counter" style="text-align:left;color:var(--amber)">
+              Location unavailable — please choose a zone.</div>`}`
+          : html`
+            <div class="loc">
+              <${Icon} d=${I.pin} s=${18} style=${{color:"var(--red)"}}/>
+              <span class="txt">${zoneLabel}</span>
+              <button onClick=${() => { setPos(undefined); getPosition().then(setPos); }} aria-label="Re-locate">
+                <${Icon} d=${I.pin} s=${17} style=${{color:"var(--mut)"}}/></button>
+            </div>`}
+        </div>
+        <div class="field">
+          <span class="lbl">Description <span style="text-transform:none;letter-spacing:0">(Optional)</span></span>
+          <textarea class="inp" maxLength="150" value=${desc} placeholder="What do you see?"
+            onChange=${(e) => setDesc(e.target.value)}></textarea>
+          <div class="counter">${desc.length}/150</div>
+        </div>
+        <div class="field">
+          <span class="lbl">Add Photo <span style="text-transform:none;letter-spacing:0">(Optional)</span></span>
+          <div class="photorow">
+            ${photo && html`<img src=${photo} alt="Attached"/>`}
+            <label class="photobtn">
+              <${Icon} d=${I.cam} s=${23}/>
+              <input type="file" accept="image/*" capture="environment" style="display:none"
+                onChange=${async (e) => { const f = e.target.files[0]; if (!f) return;
+                  setPhoto(URL.createObjectURL(f)); setPhotoId(await uploadPhoto(f)); }}/>
+            </label>
+          </div>
+        </div>
+        <button class="btn" disabled=${!cat || busy} onClick=${send}>
+          ${busy ? "SENDING…" : "SUBMIT REPORT"}</button>
+      </div>
+    <//>`;
+
+  /* ---- 3. SUBMITTING ---- */
+  if (screen === "submitting") {
+    const st = track && track.status;
+    const stage = !st ? 0 : st === "ai_processing" ? 2 : st === "verified" ? 3 : 4;
+    const rows = ["Sending report","Verifying information","Analyzing incident",
+                  "Finding nearest responders","Preparing response"];
+    return html`
+      <${Shell} light=${true}>
+        <div class="wrap center">
+          <div class="rings"><i></i><i></i><i></i>
+            <div class="core"><${Icon} d=${I.shield} s=${28} style=${{color:"var(--red)"}}/></div></div>
+          <h2 style="font-size:23px;font-weight:750">Report is submitting…</h2>
+          <p class="muted" style="margin:7px 0 22px">Please don't close the app.</p>
+          <div class="steps" style="text-align:left">
+            ${rows.map((r, i) => html`
+              <div key=${r} class=${"step" + (i < stage ? " done" : i === stage ? " now" : "")}>
+                <span class="dot">${i < stage && html`<${Icon} d=${I.check} s=${11} w=${3.4}
+                  style=${{color:"#04240f"}}/>`}</span>${r}
+              </div>`)}
+          </div>
+          <div class="reassure"><${Icon} d=${I.shield} s=${19}/>Help is on the way. Please stay calm.</div>
+        </div>
+      <//>`;
+  }
+
+  /* ---- 5. GUIDELINES ---- */
+  if (screen === "guide") return html`
+    <${Shell} light=${true}>
+      <div class="navbar">
+        <button onClick=${() => setScreen("track")} aria-label="Back"><${Icon} d=${I.back}/></button>
+        <b>What to do next</b><div style="flex:1"></div><${Icon} d=${I.info} s=${19}/>
+      </div>
+      <div class="wrap">
+        ${track && html`
+          <div class="sevbanner">
+            <${CatIcon} c=${track.category || "other"} s=${30}/>
+            <div><div class="t">${CAT_LABEL[track.category] || "Incident"}</div>
+              <div class="muted" style="font-size:13px">AI Severity: ${PRIO[track.priority]} (P${track.priority})</div></div>
+          </div>
+          <h3 style="font-size:16px;font-weight:750;margin-bottom:13px">Follow these guidelines</h3>
+          ${(track.sopSteps || []).map((s, i) => html`
+            <div key=${i} class="sop"><span class="n">${i + 1}</span><span>${s}</span></div>`)}
+          <p class="muted" style="font-size:11.5px;margin-top:10px">Source: ${track.sopSource}</p>`}
+        <a class="btn" href="tel:112" style="margin-top:22px;text-decoration:none">
+          <${Icon} d=${I.phone} s=${19} fill="currentColor" w=${0}/> EMERGENCY HELPLINE</a>
+        <div class="helprow">
+          <a href="tel:100">100 POLICE</a><a href="tel:101">101 FIRE</a><a href="tel:102">102 AMBULANCE</a>
+        </div>
+      </div>
+    <//>`;
+
+  /* ---- 4. TRACK ---- */
+  const assigned = track && ["dispatched","en_route","on_scene"].includes(track.status);
+  return html`
+    <${Shell} light=${true}>
+      <div class="navbar">
+        <b>Track Report</b><div style="flex:1"></div><${Icon} d=${I.info} s=${19}/>
+      </div>
+      <div class="wrap">
+        <div class="idcard">
+          <div><span class="lbl">Incident ID</span><div class="v red">${incId ? displayId(incId) : "—"}</div></div>
+          <div style="text-align:right"><span class="lbl">Status</span>
+            <div class="v" style=${{color: assigned ? "var(--green)" : "var(--amber)"}}>
+              ${track ? STATUS_TEXT[track.status] : "…"}</div></div>
+        </div>
+        ${merged && html`<p class="muted" style="margin-bottom:14px">Merged with nearby reports.</p>`}
+        ${assigned ? html`
+          <div class="respcard">
+            <div class="top">
+              <div><span class="lbl">Responder</span>
+                <div class="name">${ROLE_LABEL[track.responder.role]} ${track.responder.code}</div></div>
+              <${Icon} d=${I.truck} s=${30} style=${{color:"var(--red)"}}/>
+            </div>
+            <div style="margin-top:16px"><span class="lbl">ETA</span>
+              <div class="eta">${track.responder.etaMin} min</div></div>
+          </div>
+          <p class="muted center" style="margin-bottom:16px">
+            We've assigned the nearest responder to your location.</p>
+          <button class="btn ghost" onClick=${() => setScreen("guide")}>
+            <${Icon} d=${I.pin} s=${18}/> VIEW LIVE TRACKING</button>`
+        : track && track.status === "resolved" ? html`
+          <div class="emptyart"><${Icon} d=${I.check} s=${44} style=${{color:"var(--green)"}}/>
+            <h3 style="font-size:19px;font-weight:750;margin-top:14px">Resolved. Stay safe.</h3></div>`
+        : html`
+          <div class="emptyart">
+            <${Icon} d=${I.run} s=${44} style=${{color:"var(--red)",opacity:.55}}/>
+            <h3 style="font-size:18px;font-weight:700;margin:16px 0 7px">
+              We are finding the nearest available responder.</h3>
+            <p class="muted">This may take a few moments.</p>
+          </div>`}
+        <div class="reassure" style="margin-top:18px">
+          <${Icon} d=${I.shield} s=${19}/>Help is on the way. Stay calm and stay safe.</div>
+        <button class="btn ghost sm" style="margin-top:14px" onClick=${() => setScreen("guide")}>
+          What to do next</button>
+        <button class="btn ghost sm" style="margin-top:9px;border-color:var(--line);color:var(--mut)"
+          onClick=${() => { setScreen("home"); setIncId(null); setCat(null); setDesc(""); setPhoto(null); setPhotoId(null); }}>
+          Report something else</button>
+      </div>
+    <//>`;
+}
+function BroadcastBar() {
+  const b = useBroadcast();
+  return b ? html`<div class="banner"><${Icon} d=${I.bell} s=${17}/><span>${b.message}</span></div>` : null;
+}
+
+/* ═══════════ ROUTE /responder ═══════════ */
+function Responder() {
+  const [ok, setOk] = useState(() => localStorage.getItem("aegis_resp") === "1");
+  const [pass, setPass] = useState(""); const [err, setErr] = useState("");
+  const [unitId, setUnitId] = useState(() => localStorage.getItem("aegis_unit") || "");
+  const [busy, setBusy] = useState(false);
+  const [sim, setSim] = useState(false);
+  const responders = useResponders();
+  const board = useBoard();
+
+  const unit = (responders || []).find((r) => r._id === unitId);
+  const job = (board || []).find((i) => i.responder && unit &&
+    i.responder.code === unit.code && i.status !== "resolved");
+
+  useEffect(() => {
+    if (!sim || !job || !unit || job.status !== "en_route") return;
+    const t = setInterval(() => {
+      moveResponder(unit._id, unit.lat + (job.lat - unit.lat) * .25, unit.lng + (job.lng - unit.lng) * .25);
+    }, 3000);
+    return () => clearInterval(t);
+  }, [sim, job && job.status, unit && unit._id, unit && unit.lat]);
+
+  if (!ok) return html`
+    <${Shell}>
+      <div class="d"><div class="gate"><div class="card">
+        <${Icon} d=${I.shield} s=${34} style=${{color:"var(--red)"}}/>
+        <h3 style="margin-top:12px">Responder access</h3>
+        <p class="muted" style="margin-bottom:16px">Venue staff only. Enter the shift passcode.</p>
+        <input class="inp" type="password" placeholder="Passcode" value=${pass}
+          onChange=${(e) => setPass(e.target.value)}
+          onKeyDown=${(e) => e.key === "Enter" && go()}/>
+        <button class="btn" style="margin-top:12px" onClick=${go}>ENTER</button>
+        ${err && html`<p class="err">${err}</p>`}
+      </div></div></div>
+    <//>`;
+  async function go() {
+    const r = await responderLogin(pass);
+    if (r.ok) { localStorage.setItem("aegis_resp", "1"); setOk(true); }
+    else setErr("Incorrect passcode.");
+  }
+
+  const next = job && { dispatched:["ACCEPT", accept], en_route:["ON SCENE", onScene],
+                        on_scene:["RESOLVED", resolveInc] }[job.status];
+
+  return html`
+    <${Shell} clock=${true}>
+      <div class="d"><div class="wrap">
+        <span class="lbl">Your unit</span>
+        <select class="inp" style="margin:7px 0 20px" value=${unitId}
+          onChange=${(e) => { setUnitId(e.target.value); localStorage.setItem("aegis_unit", e.target.value); }}>
+          <option value="">Select your unit…</option>
+          ${(responders || []).map((r) => html`
+            <option key=${r._id} value=${r._id}>${r.code} — ${r.name} (${r.role})</option>`)}
+        </select>
+
+        ${!unit ? html`<p class="muted center" style="padding:40px 0">Select your unit to go on duty.</p>`
+        : !job ? html`
+          <div class="standby">
+            <${Icon} d=${I.shield} s=${46} style=${{color:"var(--dmut)"}}/>
+            <div class="big">Standing by</div>
+            <div style="display:flex;gap:9px;justify-content:center;align-items:center">
+              <span class="rolebadge" style=${{color:ROLE_COLOR[unit.role]}}>${unit.role}</span>
+              <span class="mono muted">${unit.code}</span>
+            </div>
+            <p class="muted" style="margin-top:16px">
+              <span style="color:var(--green)">●</span> On duty — you'll be alerted on assignment.</p>
+          </div>`
+        : html`
+          <div class="assign">
+            <div style="display:flex;gap:11px;align-items:center">
+              <${CatIcon} c=${job.category} s=${26}/>
+              <span class=${"chip p" + job.priority}>P${job.priority} ${PRIO[job.priority]}</span>
+              <div style="flex:1"></div>
+              <span class="rolebadge" style=${{color:ROLE_COLOR[unit.role]}}>${unit.role}</span>
+            </div>
+            <h3>${job.headline}</h3>
+            <p class="muted">${job.zone}</p>
+            <div class="metrow">
+              <div><span class="lbl">Status</span><div class="v" style="font-size:15px">${job.status.replace(/_/g," ")}</div></div>
+              <div><span class="lbl">Reports</span><div class="v">${job.reportCount}</div></div>
+              <div><span class="lbl">Unit</span><div class="v mono" style="font-size:15px">${unit.code}</div></div>
+            </div>
+            ${(job.sopSteps || []).slice(0, 4).map((s, i) => html`
+              <div key=${i} class="sop" style="font-size:13px"><span class="n">${i + 1}</span><span>${s}</span></div>`)}
+            ${next && html`
+              <button class="btn green" style="margin-top:16px" disabled=${busy}
+                onClick=${async () => { setBusy(true); await next[1](job._id); setBusy(false); }}>
+                ${busy ? "…" : next[0]}</button>`}
+            <label class="toggle">
+              <input type="checkbox" checked=${sim} onChange=${(e) => setSim(e.target.checked)}/>
+              Simulate movement (demo)</label>
+          </div>`}
+      </div></div>
+    <//>`;
+}
+
+/* ═══════════ ROUTE /command ═══════════ */
+function Command() {
+  const [ok, setOk] = useState(() => localStorage.getItem("aegis_op") === "1");
+  const [email, setEmail] = useState("operator");
+  const [pw, setPw] = useState(""); const [err, setErr] = useState("");
+  const [sel, setSel] = useState(null);
+  const [msg, setMsg] = useState("");
+  const board = useBoard();
+  const responders = useResponders();
+  const venue = useVenue();
+  const detail = useDetail(sel);
+
+  if (!ok) return html`
+    <${Shell} clock=${true}>
+      <div class="d"><div class="gate"><div class="card">
+        <${Icon} d=${I.shield} s=${34} style=${{color:"var(--red)"}}/>
+        <h3 style="margin-top:12px">AEGIS Command</h3>
+        <p class="muted" style="margin-bottom:17px">Authorized venue operators only.</p>
+        <input class="inp" style="margin-bottom:9px" value=${email} onChange=${(e) => setEmail(e.target.value)}/>
+        <input class="inp" type="password" placeholder="Password" value=${pw}
+          onChange=${(e) => setPw(e.target.value)} onKeyDown=${(e) => e.key === "Enter" && go()}/>
+        <button class="btn" style="margin-top:12px" onClick=${go}>LOG IN</button>
+        ${err && html`<p class="err">${err}</p>`}
+      </div></div></div>
+    <//>`;
+  async function go() {
+    const r = await login(email, pw);
+    if (r.ok) { localStorage.setItem("aegis_op", "1"); setOk(true); } else setErr("Incorrect credentials.");
+  }
+
+  const list = board || [];
+  const active = list.filter((i) => i.status !== "resolved");
+  const crit = active.filter((i) => i.priority === 1);
+  const done = list.filter((i) => i.status === "resolved");
+
+  return html`
+    <${Shell} clock=${true}>
+      <div class="d"><div class="cmdwrap">
+        <div class="cmdhead">
+          <h2>UNIFIED COMMAND CENTER</h2>
+          <span class="muted">${venue ? venue.name : ""}</span>
+          <div class="spacer"></div>
+          <button class="btn sm" style="width:auto;padding:0 16px;background:transparent;
+            border:1px solid var(--dline);color:var(--dmut)"
+            onClick=${() => { localStorage.removeItem("aegis_op"); setOk(false); }}>Log out</button>
+        </div>
+
+        <div class="stats">
+          <div class="stat"><div class="n">${String(active.length).padStart(2,"0")}</div><div class="l">Active Incidents</div></div>
+          <div class=${"stat" + (crit.length ? " crit" : "")}>
+            <div class="n">${String(crit.length).padStart(2,"0")}</div><div class="l">Critical (P1)</div></div>
+          <div class="stat"><div class="n">${String((responders||[]).length).padStart(2,"0")}</div><div class="l">Units Online</div></div>
+          <div class="stat"><div class="n">${String(done.length).padStart(2,"0")}</div><div class="l">Resolved Today</div></div>
+        </div>
+
+        <div class="cols">
+          <!-- LEFT -->
+          <div style="display:flex;flex-direction:column;gap:14px">
+            <div class="panel">
+              <div class="hd"><span class="lbl">Live incident map</span>
+                <span class="muted" style="font-size:11.5px">${active.length} active</span></div>
+              <div class="map"><${VenueMap} venue=${venue} incidents=${active} responders=${responders||[]}/></div>
+            </div>
+            <div class="panel">
+              <div class="hd"><span class="lbl">Recent incidents</span></div>
+              <table><thead><tr><th>ID</th><th>Type</th><th>Location</th><th>Priority</th><th>Status</th></tr></thead>
+                <tbody>${list.slice(0, 6).map((i) => html`
+                  <tr key=${i._id}><td class="mono" style="font-size:11px">${displayId(i._id)}</td>
+                    <td>${CAT_LABEL[i.category]}</td><td>${i.zone}</td>
+                    <td><span class=${"chip p" + i.priority}>P${i.priority}</span></td>
+                    <td style=${{color: i.status === "resolved" ? "var(--dmut)" : "var(--red)"}}>${i.status.replace(/_/g," ")}</td>
+                  </tr>`)}
+                  ${!list.length && html`<tr><td colSpan="5" class="muted" style="padding:20px 15px">No incidents yet.</td></tr>`}
+                </tbody></table>
+            </div>
+          </div>
+
+          <!-- MIDDLE -->
+          <div class="panel"><div class="hd"><span class="lbl">Incident queue</span></div>
+            <div class="bd">
+              ${active.map((i) => html`
+                <button key=${i._id} type="button"
+                  aria-pressed=${sel === i._id}
+                  class=${"q" + (sel === i._id ? " sel" : "") + (i.priority === 1 ? " crit" : "")}
+                  onClick=${() => setSel(i._id)}>
+                  <div style="display:flex;gap:9px;align-items:center">
+                    <span class=${"chip p" + i.priority}>P${i.priority}</span>
+                    <${CatIcon} c=${i.category} s=${16}/>
+                    <div style="flex:1"></div>
+                    ${i.responder && html`<span class="mono" style="font-size:11.5px;color:var(--dmut)">${i.responder.code}</span>`}
+                  </div>
+                  <div class="hl">${i.headline}</div>
+                  <div class="meta"><span>${i.zone}</span><span>·</span><span>${i.reportCount} report(s)</span>
+                    <span>·</span><span>${i.status.replace(/_/g," ")}</span></div>
+                  <div class="confbar"><i style=${{width: i.confidence + "%"}}></i></div>
+                </button>`)}
+              ${!active.length && html`<p class="muted center" style="padding:34px 0">No active incidents.</p>`}
+            </div>
+          </div>
+
+          <!-- RIGHT -->
+          <div class="panel"><div class="hd"><span class="lbl">Incident detail</span></div>
+            <div class="bd">
+              ${!sel ? html`<p class="muted center" style="padding:34px 0">Select an incident.</p>`
+              : !detail ? html`<p class="muted center" style="padding:34px 0">Loading incident…</p>` : html`
+                <div style="display:flex;gap:10px;align-items:center;margin-bottom:9px">
+                  <${CatIcon} c=${detail.category} s=${22}/>
+                  <span class=${"chip p" + detail.priority}>P${detail.priority} ${PRIO[detail.priority]}</span>
+                  <span class="muted" style="font-size:11.5px">${detail.status.replace(/_/g," ")}</span>
+                </div>
+                <h3 style="font-size:18px;font-weight:750">${detail.headline}</h3>
+                <p class="muted" style="margin:5px 0 12px">
+                  ${detail.zone} · ${time(detail._creationTime)} · Reported by Anonymous ·
+                  <span class="mono">${displayId(detail._id)}</span></p>
+
+                <div class=${"aipanel" + (detail.aiFailed ? " fail" : "")}>
+                  <span class="lbl" style=${{color: detail.aiFailed ? "var(--amber)" : "var(--red)"}}>
+                    ${detail.aiFailed ? "AI unavailable — manual mode" : "AI suggestion"}</span>
+                  <p style="font-size:13.5px;margin:8px 0 10px">
+                    ${detail.aiFailed ? "Rule-based severity applied. Operator judgement required." : detail.summary}</p>
+                  <div style="display:flex;align-items:center;gap:10px">
+                    <div class="confbar" style="flex:1"><i style=${{width: detail.confidence + "%"}}></i></div>
+                    <span class="mono" style="font-size:11.5px">${detail.confidence}%</span>
+                  </div>
+                </div>
+
+                <span class="lbl">Recommended actions</span>
+                <div style="margin:9px 0 6px">
+                  ${(detail.sopSteps || []).map((s, i) => html`
+                    <div key=${i} class="sop" style="font-size:13px"><span class="n">${i + 1}</span><span>${s}</span></div>`)}
+                </div>
+                <p class="muted" style="font-size:11px;margin-bottom:13px">Source: ${detail.sopSource}</p>
+                ${(detail.photos || []).map((u) => html`<img key=${u} src=${u}
+                  style="width:100%;border-radius:11px;margin-bottom:10px"/>`)}
+
+                ${!detail.assignedResponderId && detail.status !== "resolved" ? html`
+                  <button class="btn" onClick=${() => dispatchUnit(detail._id)}>DISPATCH NEAREST UNIT</button>`
+                : detail.responder ? html`
+                  <div class="card" style="display:flex;justify-content:space-between;align-items:center">
+                    <div><span class="lbl">Assigned</span>
+                      <div style="font-weight:750;margin-top:3px">${ROLE_LABEL[detail.responder.role]} ${detail.responder.code}</div></div>
+                    <span class="rolebadge" style=${{color:ROLE_COLOR[detail.responder.role]}}>${detail.responder.role}</span>
+                  </div>` : null}
+                ${detail.status !== "resolved" && html`
+                  <button class="btn sm" style="margin-top:9px;background:transparent;border:1px solid var(--dline);color:var(--dmut)"
+                    onClick=${() => resolveInc(detail._id)}>MARK RESOLVED</button>`}
+                <p class="muted" style="font-size:11px;margin:12px 0">AI recommends. Operators decide.</p>
+
+                <span class="lbl">Activity feed</span>
+                <div class="feed" style="margin-top:8px">
+                  ${(detail.events || []).map((e) => html`
+                    <div key=${e._id}><time>${time(e._creationTime)}</time><span>${e.msg}</span></div>`)}
+                </div>`}
+
+              <div style="margin-top:16px;padding-top:14px;border-top:1px solid var(--dline)">
+                <span class="lbl">Exit guidance broadcast</span>
+                <input class="inp" style="margin-top:8px" placeholder="Message to every phone on site…"
+                  value=${msg} onChange=${(e) => setMsg(e.target.value)}/>
+                <div class="tmpl">
+                  ${["Evacuate via Gate 3B","Avoid the east concourse","Medical corridor in use — keep Gate 2 clear"]
+                    .map((t) => html`<button key=${t} onClick=${() => setMsg(t)}>${t}</button>`)}
+                </div>
+                <div style="display:flex;gap:9px">
+                  <button class="btn sm" onClick=${() => { if (msg.trim()) { sendBroadcast(msg.trim()); setMsg(""); } }}>SEND</button>
+                  <button class="btn sm" style="background:transparent;border:1px solid var(--dline);color:var(--dmut)"
+                    onClick=${clearBroadcast}>CLEAR</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div></div>
+    <//>`;
+}
+
+/* schematic venue map — never an empty box */
+function VenueMap({ venue, incidents, responders }) {
+  if (!venue) return html`<div class="muted center" style="padding:50px 0">Loading venue…</div>`;
+  const pts = [...venue.gates.map((g) => [g.lng, g.lat]),
+               ...incidents.map((i) => [i.lng, i.lat]), ...responders.map((r) => [r.lng, r.lat])];
+  const xs = pts.map((p) => p[0]), ys = pts.map((p) => p[1]);
+  const pad = 0.0012;
+  const x0 = Math.min(...xs) - pad, x1 = Math.max(...xs) + pad;
+  const y0 = Math.min(...ys) - pad, y1 = Math.max(...ys) + pad;
+  const X = (lng) => ((lng - x0) / (x1 - x0 || 1)) * 100;
+  const Y = (lat) => (1 - (lat - y0) / (y1 - y0 || 1)) * 100;
+  const PC = { 1:"#E11D2E", 2:"#F59E0B", 3:"#22C55E", 4:"#22C55E" };
+  return html`
+    <svg viewBox="0 0 100 70" preserveAspectRatio="none">
+      <defs><pattern id="g" width="8" height="8" patternUnits="userSpaceOnUse">
+        <path d="M8 0H0v8" fill="none" stroke="#1C1C21" strokeWidth=".4"/></pattern></defs>
+      <rect width="100" height="70" fill="url(#g)"/>
+      ${venue.gates.map((g) => html`
+        <g key=${g.name}>
+          <rect x=${X(g.lng) - 1.6} y=${Y(g.lat) * .7 - 1.1} width="3.2" height="2.2" rx=".6"
+            fill=${g.isExit ? "rgba(34,197,94,.22)" : "#212127"}
+            stroke=${g.isExit ? "#22C55E" : "#2A2A30"} strokeWidth=".3"/>
+          <text x=${X(g.lng)} y=${Y(g.lat) * .7 + 3.6} fontSize="2.1" fill="#8E8E96"
+            textAnchor="middle">${g.name}</text>
+        </g>`)}
+      ${responders.map((r) => html`
+        <circle key=${r._id} cx=${X(r.lng)} cy=${Y(r.lat) * .7} r="1.15"
+          fill=${{fire:"#E11D2E",medic:"#22C55E",marshal:"#F59E0B",security:"#A855F7"}[r.role]}
+          opacity=${r.available ? .95 : .45}/>`)}
+      ${incidents.map((i) => html`
+        <g key=${i._id}>
+          <circle cx=${X(i.lng)} cy=${Y(i.lat) * .7} r="4" fill=${PC[i.priority]} opacity=".15">
+            <animate attributeName="r" values="3;6.5;3" dur="2.4s" repeatCount="indefinite"/>
+            <animate attributeName="opacity" values=".28;0;.28" dur="2.4s" repeatCount="indefinite"/>
+          </circle>
+          <circle cx=${X(i.lng)} cy=${Y(i.lat) * .7} r="1.7" fill=${PC[i.priority]}/>
+        </g>`)}
+    </svg>`;
+}
+
+/* ═══════════ router — 3 routes + catch-all redirect ═══════════ */
+function App() {
+  const [path, setPath] = useState(() => location.hash.replace("#", "") || "/");
+  useEffect(() => {
+    const on = () => {
+      const p = location.hash.replace("#", "") || "/";
+      if (!["/", "/responder", "/command"].includes(p)) { location.hash = "#/"; return; }
+      setPath(p);
+    };
+    on(); addEventListener("hashchange", on); return () => removeEventListener("hashchange", on);
+  }, []);
+  if (path === "/command") return html`<${Command}/>`;
+  if (path === "/responder") return html`<${Responder}/>`;
+  return html`<${Reporter}/>`;
+}
+createRoot(document.getElementById("root")).render(html`<${App}/>`);
+</script>

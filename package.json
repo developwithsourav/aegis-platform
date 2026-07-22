@@ -7,7 +7,8 @@
     "dev": "convex dev",
     "seed": "convex run seed:all",
     "reset": "convex run seed:resetIncidents",
-    "harness": "python -m http.server 4300 --directory harness"
+    "harness": "python -m http.server 4300 --directory harness",
+    "app": "python -m http.server 4320 --directory reference-app"
   },
   "dependencies": {
     "convex": "^1.42.3"
