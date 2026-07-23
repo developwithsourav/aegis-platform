@@ -25,16 +25,31 @@ export const generateUploadUrl = mutation({
 
 // ---------- report ingestion with dedup ----------
 export const submitReport = mutation({
+  // Accept null as well as undefined for every optional field. Browser clients
+  // routinely send `null` for an empty value (e.g. lat when GPS is denied), and
+  // Convex validators treat null and undefined as distinct — without this, any
+  // report without GPS is rejected with an ArgumentValidationError.
   args: {
     category: v.string(),
-    description: v.optional(v.string()),
-    phone: v.optional(v.string()),
-    lat: v.optional(v.number()),
-    lng: v.optional(v.number()),
-    zone: v.optional(v.string()),
-    photoId: v.optional(v.id("_storage")),
+    description: v.optional(v.union(v.string(), v.null())),
+    phone: v.optional(v.union(v.string(), v.null())),
+    lat: v.optional(v.union(v.number(), v.null())),
+    lng: v.optional(v.union(v.number(), v.null())),
+    zone: v.optional(v.union(v.string(), v.null())),
+    photoId: v.optional(v.union(v.id("_storage"), v.null())),
   },
-  handler: async (ctx, args) => {
+  handler: async (ctx, raw) => {
+    // Normalize null -> undefined so the rest of the logic and the reports
+    // insert (which uses the strict optional-number schema) stay clean.
+    const args = {
+      category: raw.category,
+      description: raw.description ?? undefined,
+      phone: raw.phone ?? undefined,
+      lat: raw.lat ?? undefined,
+      lng: raw.lng ?? undefined,
+      zone: raw.zone ?? undefined,
+      photoId: raw.photoId ?? undefined,
+    };
     // resolve zone: nearest venue gate if GPS given, else manual zone, else Unknown
     let zone = args.zone ?? "Unknown zone";
     let lat = args.lat, lng = args.lng;
