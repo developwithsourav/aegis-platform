@@ -203,14 +203,11 @@ border and red label. Then:
    pin icon and re-locate button. If position is null, show a dropdown of gate
    names from useVenue() and say location is unavailable.
  - "Description (Optional)": textarea, live counter, max 150 chars.
- - "Callback number (Optional)": tel input, digits only, max 10, placeholder
-   "So the control room can call you back", with the caption "Only used to call
-   you back. Skip it — it never delays your report."
+ - "Callback number (Optional)": a tel input, digits only, max 10, placeholder
+   "So the control room can call you back", caption "Skip this freely. Your
+   location is taken from GPS, never from this number."
  - "Add Photo (Optional)": thumbnail beside a camera capture tile; on selection
    call uploadPhoto(file) and hold the returned photoId.
- - "Callback number (Optional)": a tel input, digits only, max 10, placeholder
-   "So the control room can call you back", with the caption "Skip this freely.
-   Your location is taken from GPS, never from this number."
  - Full-width red "SUBMIT REPORT", enabled the moment a category is chosen.
    Never require description, photo or phone.
 On submit call submitReport({category, description, phone, lat, lng, zone,
@@ -306,8 +303,8 @@ RIGHT — detail panel from useDetail(selectedId):
  - Meta row: reported time, "Reported by Anonymous", displayId.
  - A "Reporter callback" card, shown ONLY when a number exists: take the first
    truthy phone across detail.reports (a merged duplicate may carry it), and
-   render it as a tel: link with a "Tap to call" affordance, so the control room
-   can call back in one tap.
+   render it as a green outlined tel: link with a "Tap to call" affordance, so
+   the control room can call back in one tap.
  - The summary text.
  - "AI SUGGESTION" panel captioned "Based on incident analysis": the summary and
    a confidence bar showing confidence as a percentage. If aiFailed is true,
@@ -317,9 +314,6 @@ RIGHT — detail panel from useDetail(selectedId):
    caption beneath reading sopSource.
  - "EVIDENCE FROM REPORTER": any URL in photos[] as a thumbnail that opens full
    size in a new tab. Omit the whole block when there are no photos.
- - "REPORTER CALLBACK": the first non-empty phone across reports[], rendered as
-   a green outlined tel: link the operator can tap to call. When no reporter
-   left a number, show the quiet line "Reporter left no callback number."
  - A red "DISPATCH NEAREST UNIT" calling dispatch(_id). Once assignedResponderId
    exists, hide it and show the assigned unit's code, role and status instead.
  - "MARK RESOLVED" calling resolve(_id).
