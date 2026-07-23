@@ -10,9 +10,11 @@
   --bg:#FFFFFF; --panel:#F7F8FA; --line:#E8E9EC; --ink:#0A0A0C; --mut:#6B6C72;
   --red:#E11D2E; --red-d:#B3121F; --softred:#FDECEE;
   --green:#22C55E; --amber:#F59E0B;
-  /* operational / dark surface */
-  --dbg:#0A0A0C; --dsurf:#141417; --dcard:#1B1B1F; --dline:#2A2A30;
-  --dink:#F5F5F6; --dmut:#8E8E96;
+  /* operational surface — LIGHT everywhere now. Command/Responder are white too:
+     a dark dashboard washes out on a bright-hall projector; white stays crisp.
+     Page is a hair grey so white cards lift off it. */
+  --dbg:#F3F4F6; --dsurf:#FFFFFF; --dcard:#FFFFFF; --dline:#E6E8EB;
+  --dink:#0A0A0C; --dmut:#6B6C72;
   /* roles */
   --r-fire:#E11D2E; --r-medic:#22C55E; --r-marshal:#F59E0B; --r-security:#A855F7;
   --radius:14px;
@@ -78,14 +80,14 @@ a{color:inherit}
 
 /* ============ reporter: home (dark hero) ============ */
 .hero{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;
-  gap:26px;padding:36px 22px 44px;text-align:center;color:var(--dink);position:relative;
+  gap:26px;padding:36px 22px 44px;text-align:center;color:var(--ink);position:relative;
   background:
-    radial-gradient(120% 80% at 50% 0%, #241016 0%, transparent 60%),
-    radial-gradient(90% 60% at 50% 100%, #2a0d13 0%, transparent 65%),
-    var(--dbg);
+    radial-gradient(120% 85% at 50% 0%, #FFF1F2 0%, transparent 58%),
+    radial-gradient(95% 70% at 50% 100%, #FDECEE 0%, transparent 62%),
+    #FFFFFF;
   overflow:hidden}
-.hero::before{content:"";position:absolute;inset:0;opacity:.16;
-  background-image:repeating-linear-gradient(115deg,#fff 0 1px,transparent 1px 26px);
+.hero::before{content:"";position:absolute;inset:0;opacity:.6;
+  background-image:repeating-linear-gradient(115deg,#F0F1F3 0 1px,transparent 1px 26px);
   mask-image:radial-gradient(70% 55% at 50% 62%,#000 0%,transparent 75%)}
 .hero>*{position:relative}
 .shield{width:64px;height:64px}
@@ -100,8 +102,8 @@ a{color:inherit}
 .sos span{font-size:11.5px;font-weight:750;letter-spacing:.13em;opacity:.93}
 @keyframes sospulse{0%,100%{box-shadow:0 0 0 12px rgba(225,29,46,.13),0 0 64px rgba(225,29,46,.42)}
   50%{box-shadow:0 0 0 22px rgba(225,29,46,.05),0 0 88px rgba(225,29,46,.55)}}
-.hero .pill{background:rgba(255,255,255,.05);border-color:var(--dline);color:var(--dink)}
-.hero .cap{color:var(--dmut);font-size:12.5px}
+.hero .pill{background:var(--panel);border-color:var(--line);color:var(--ink)}
+.hero .cap{color:var(--mut);font-size:12.5px}
 
 /* ============ reporter: form ============ */
 .navbar{display:flex;align-items:center;gap:12px;padding:14px 18px;border-bottom:1px solid var(--line);
@@ -216,7 +218,7 @@ textarea.inp{resize:none;min-height:82px}
 .panel>.hd{padding:12px 15px;border-bottom:1px solid var(--dline);display:flex;
   align-items:center;justify-content:space-between}
 .panel>.bd{padding:14px 15px}
-.map{aspect-ratio:16/11;background:#0E0E11;position:relative;overflow:hidden}
+.map{aspect-ratio:16/11;background:#EEF0F3;position:relative;overflow:hidden}
 .map svg{width:100%;height:100%;display:block}
 table{width:100%;border-collapse:collapse;font-size:12.5px}
 th{text-align:left;padding:9px 15px;color:var(--dmut);font-size:10.5px;font-weight:800;
@@ -227,15 +229,15 @@ tr:last-child td{border-bottom:0}
   border:1px solid var(--dline);border-left:3px solid var(--dline);border-radius:11px;
   padding:13px 14px;margin-bottom:9px;cursor:pointer;transition:border-color .15s,background .15s;
   background:var(--dcard)}
-.q:hover{background:#202024}
-.q.sel{border-left-color:var(--red);background:#212126}
+.q:hover{background:#F1F2F4}
+.q.sel{border-left-color:var(--red);background:var(--softred)}
 .q.crit{animation:critline 2.2s ease-in-out infinite}
 @keyframes critline{0%,100%{border-left-color:var(--red)}50%{border-left-color:rgba(225,29,46,.3)}}
 .q .hl{font-weight:700;font-size:14.5px;margin:7px 0 5px}
 .q .meta{font-size:11.5px;color:var(--dmut);display:flex;gap:9px;flex-wrap:wrap}
 .confbar{height:5px;border-radius:99px;background:var(--dline);overflow:hidden;margin-top:8px}
 .confbar i{display:block;height:100%;background:var(--red);border-radius:99px;transition:width .4s}
-.aipanel{border:1px solid var(--dline);border-radius:12px;padding:14px;background:#17171B;margin-bottom:14px}
+.aipanel{border:1px solid var(--dline);border-radius:12px;padding:14px;background:#F7F8FA;margin-bottom:14px}
 .aipanel.fail{border-color:var(--amber);background:rgba(245,158,11,.08)}
 .feed{max-height:210px;overflow-y:auto;font-size:12.5px}
 .feed div{display:flex;gap:11px;padding:7px 0;border-bottom:1px solid var(--dline);color:var(--dmut)}
@@ -987,14 +989,14 @@ function VenueMap({ venue, incidents, responders }) {
   return html`
     <svg viewBox="0 0 100 70" preserveAspectRatio="none">
       <defs><pattern id="g" width="8" height="8" patternUnits="userSpaceOnUse">
-        <path d="M8 0H0v8" fill="none" stroke="#1C1C21" strokeWidth=".4"/></pattern></defs>
+        <path d="M8 0H0v8" fill="none" stroke="#E1E3E7" strokeWidth=".4"/></pattern></defs>
       <rect width="100" height="70" fill="url(#g)"/>
       ${venue.gates.map((g) => html`
         <g key=${g.name}>
           <rect x=${X(g.lng) - 1.6} y=${Y(g.lat) * .7 - 1.1} width="3.2" height="2.2" rx=".6"
-            fill=${g.isExit ? "rgba(34,197,94,.22)" : "#212127"}
-            stroke=${g.isExit ? "#22C55E" : "#2A2A30"} strokeWidth=".3"/>
-          <text x=${X(g.lng)} y=${Y(g.lat) * .7 + 3.6} fontSize="2.1" fill="#8E8E96"
+            fill=${g.isExit ? "rgba(34,197,94,.18)" : "#E4E7EB"}
+            stroke=${g.isExit ? "#22C55E" : "#CFD3D8"} strokeWidth=".3"/>
+          <text x=${X(g.lng)} y=${Y(g.lat) * .7 + 3.6} fontSize="2.1" fill="#6B6C72"
             textAnchor="middle">${g.name}</text>
         </g>`)}
       ${responders.map((r) => html`

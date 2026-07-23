@@ -35,21 +35,23 @@ by a live Convex backend; connect to it, do not invent one.
   refetching — the hooks are live subscriptions that push updates themselves.
 - Use the exact field names and enum values given. Never rename or invent them.
 
-════════ DESIGN SYSTEM "Guardian Red" — two surfaces ════════
-PUBLIC SURFACE (Reporter) is LIGHT so it stays readable outdoors in direct
-sunlight: page #FFFFFF, panel #F7F8FA, border #E8E9EC, text #0A0A0C,
-muted #6B6C72, red #E11D2E, soft red #FDECEE.
-Exception: the Reporter HOME screen is a dark cinematic hero, #0A0A0C over a
-dimmed crowd photograph. Every screen after it is light.
+════════ DESIGN SYSTEM "Guardian Red" — LIGHT everywhere ════════
+ALL THREE routes use one light surface. No dark surface anywhere — a dark
+dashboard washes out on a bright projector; white stays crisp and legible, and
+red on white reads as urgent more strongly than red on black.
+  page #FFFFFF, a slightly grey app background #F3F4F6 for the Command/Responder
+  canvas so white cards lift off it, panel #F7F8FA, border #E6E8EB,
+  text #0A0A0C, muted #6B6C72, red #E11D2E, soft red #FDECEE.
 
-OPERATIONAL SURFACE (Responder, Command) is DARK for a control room and
-projector: bg #0A0A0C, surface #141417, card #1B1B1F, border #2A2A30,
-text #F5F5F6, muted #8E8E96.
+The Reporter HOME is also light: a warm off-white hero (soft #FFF1F2 / #FDECEE
+radial washes over #FFFFFF) carrying the red SOS button. NO photo, NO dark hero.
 
 Shared: red #E11D2E, green #22C55E, amber #F59E0B.
 Priority colors: P1 red, P2 amber, P3/P4 green.
 Role colors, used ONLY on a role badge and route line: fire red, medic green,
 marshal amber, security purple. Never use blue as a UI color.
+Cards are white with 1px #E6E8EB borders and no heavy shadows. Keep it clean and
+bright, like a modern professional ops tool — not a dark "command center".
 
 Type: Inter or system font, high contrast, confident. Unit codes and numbers in
 tabular/mono. Uppercase letter-spaced micro-labels on status chips.
@@ -182,7 +184,8 @@ One incident is assigned exactly ONE unit. There is no multi-unit dispatch and
 no decline action.
 
 ════════ STEP 2 — ROUTE / : REPORTER (light, 5 screens) ════════
-SCREEN 1 HOME (the only dark screen): dark hero over a dimmed crowd photo.
+SCREEN 1 HOME (light, warm hero — no photo, no dark): a warm off-white
+background (soft #FFF1F2 / #FDECEE radial washes over white).
 Centered AEGIS shield mark, "AEGIS", subtitle "Smart Emergency Response System".
 A circular red SOS button at least 190px across with a soft glow and slow
 breathing pulse, labelled "SOS" over "REPORT EMERGENCY". Below it a pill BUTTON showing a
@@ -248,7 +251,7 @@ left icon. Small caption beneath reading sopSource. Bottom: full-width red
 100 POLICE (tel:100), 101 FIRE (tel:101), 102 AMBULANCE (tel:102). Use these
 real Indian numbers, never a placeholder.
 
-════════ STEP 3 — ROUTE /responder : RESPONDER (dark) ════════
+════════ STEP 3 — ROUTE /responder : RESPONDER (light) ════════
 Gate the route with a small passcode card: one field, "ENTER", calling
 responderLogin(passcode). Render nothing else until ok is true. Remember success
 in localStorage so a device types it once. Show an inline error when ok is false.
@@ -274,7 +277,7 @@ en_route, call moveResponder(responderId, lat, lng) every 3 seconds with the
 position interpolated 25% closer to the incident each time; while off, use
 navigator.geolocation.watchPosition and send real coordinates. Thumb-reachable.
 
-════════ STEP 4 — ROUTE /command : COMMAND DASHBOARD (dark) ════════
+════════ STEP 4 — ROUTE /command : COMMAND DASHBOARD (light) ════════
 Centered login card first: email, password, "LOG IN", AEGIS mark, caption
 "Authorized venue operators only." Call login(email, password); render nothing
 else until ok. Persist the session in localStorage. Inline error when ok is false.
