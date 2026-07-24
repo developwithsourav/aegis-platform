@@ -100,27 +100,30 @@ try:
 except Exception:
     pass
 
-card(46, 40, W - 92, 236)
+card(46, 40, W - 92, 226)
 label("PROJECT TITLE", 68, 254)
 c.setFillColor(INK); c.setFont("Helvetica-Bold", 15)
 c.drawString(68, 232, "AEGIS — AI Emergency Grid & Incident System")
 
-label("TEAM", 68, 200); label("EVENT", 300, 200)
-label("PROBLEM STATEMENT ID", 480, 200); label("COLLEGE", 720, 200)
+# Open Innovation track: the problem was self-proposed, so there is no
+# problem-statement ID to quote. State the problem itself instead.
+label("TEAM", 68, 200); label("EVENT", 260, 200); label("TRACK", 470, 200)
 c.setFillColor(INK); c.setFont("Helvetica-Bold", 12.5)
 c.drawString(68, 180, "Ninja Coders")
-c.drawString(300, 180, "Cognitive Chaos 2026")
-c.setFillColor(RED); c.drawString(480, 180, "[FILL: Problem Statement ID]")
-c.setFillColor(INK); c.drawString(720, 180, "[FILL: College Name]")
+c.drawString(260, 180, "Cognitive Chaos 2026")
+c.drawString(470, 180, "Convex — Open Innovation (self-proposed problem)")
 
-c.setStrokeColor(LINE); c.setLineWidth(1); c.line(68, 158, W - 68, 158)
-label("TEAM MEMBERS", 68, 138, MUTE)
+label("PROBLEM STATEMENT", 68, 154, MUTE)
+c.setFillColor(INK); c.setFont("Helvetica", 11)
+c.drawString(68, 136, "Emergencies at mass gatherings unfold in seconds, but incident information is scattered, duplicated and unverified, and")
+c.drawString(68, 121, "dispatch is manual — wasting the 5 to 10 minute window in which a crush or cardiac arrest is still survivable.")
+
+c.setStrokeColor(LINE); c.setLineWidth(1); c.line(68, 106, W - 68, 106)
+label("TEAM MEMBERS", 68, 88, MUTE)
 c.setFillColor(INK); c.setFont("Helvetica", 11.5)
-c.drawString(68, 118, "Sourav Kumar   ·   Manish Joshi   ·   Siddharth Singh   ·   Rajat Kushwaha")
-c.setFillColor(MUTE); c.setFont("Helvetica", 10)
-c.drawString(68, 96, "Frontend built and deployed on EnterPro   ·   Backend entirely on Convex   ·   Three portals, one URL")
-c.setFillColor(TEAL); c.setFont("Helvetica-Bold", 10)
-c.drawString(68, 66, "Convex used as the real backend: reactive database, actions, vector search, scheduler and file storage.")
+c.drawString(68, 70, "Sourav Kumar   ·   Manish Joshi   ·   Siddharth Singh   ·   Rajat Kushwaha")
+c.setFillColor(TEAL); c.setFont("Helvetica-Bold", 9.5)
+c.drawString(560, 70, "A real-time web platform — nothing to install")
 c.showPage()
 
 # ══════════════ 2 · PROBLEM + GAP ══════════════
