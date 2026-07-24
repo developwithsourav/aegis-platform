@@ -12,7 +12,7 @@ Re-prompting to move a button is the fastest way to burn 4,000 credits. If
 something is structurally wrong, prompt only for that one route.
 
 **Live credentials** (do not put them in the prompt — type them at runtime):
-operator `operator` / `<operator password>` · responder passcode `<responder passcode>`
+operator `operator` and the responder passcode are both in team chat — never in this repo
 
 ---
 
@@ -343,7 +343,7 @@ fully working against the live backend.
 1. Check `/` on a phone → tap SOS → Medical → submit. It must appear on
    `/command` within about a second with a priority, AI summary and NDMA steps.
 2. `DISPATCH NEAREST UNIT` → a role-matched unit is assigned.
-3. Second phone on `/responder` → passcode `<responder passcode>` → pick the unit → `ACCEPT`
+3. Second phone on `/responder` → the responder passcode → pick the unit → `ACCEPT`
    → phone 1 flips to "Responder Assigned" with a live ETA.
 4. Broadcast from `/command` → amber banner on phone 1 within a second.
 5. Deploy on EnterPro. Reset data before pitching:

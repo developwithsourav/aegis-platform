@@ -5,8 +5,8 @@ Cognitive Chaos 2026 finale. Read this the morning of, once through, out loud.
 ## Setup (do this before you're called)
 
 - **Phone A** (reporter) — open the deployed URL at `/`. Fresh, on the home SOS screen.
-- **Phone B** (responder) — open `/responder`, enter passcode `<responder passcode>`, select unit **E-02 Medic Team 2**. Leave it on standby.
-- **Laptop** (projector) — open `/command`, log in `operator` / `<operator password>`. Leave it on the (empty) dashboard.
+- **Phone B** (responder) — open `/responder`, enter the responder passcode (team chat), select unit **E-02 Medic Team 2**. Leave it on standby.
+- **Laptop** (projector) — open `/command`, log in `operator` / *(operator password — team chat)*. Leave it on the (empty) dashboard.
 - **Reset the board 2 minutes before**: `npx convex run seed:resetIncidents` so you start clean.
 - Have the **audit trail** ready to scroll at the end.
 
