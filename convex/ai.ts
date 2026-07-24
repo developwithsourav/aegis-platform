@@ -135,9 +135,72 @@ function ruleTriage(category: string, description: string, zone: string) {
   };
 }
 
+/* One Gemini attempt against a specific model. Returns the text, or null with
+   the reason logged, so the caller can try the next model in the chain. */
+async function tryGemini(model: string, prompt: string): Promise<string | null> {
+  try {
+    const r = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
+      {
+        method: "POST",
+        signal: AbortSignal.timeout(9_000),
+        headers: {
+          "content-type": "application/json",
+          "x-goog-api-key": process.env.GEMINI_API_KEY!,
+        },
+        body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] }),
+      });
+    const j = await r.json();
+    if (j.error) { console.log(`[triage] gemini ${model} error ${j.error.code}: ${j.error.message}`); return null; }
+    // Thinking models can emit a thought part first, so take the first part
+    // that actually carries text rather than assuming index 0.
+    const text = j.candidates?.[0]?.content?.parts?.find((p: any) => p.text)?.text ?? null;
+    if (text) console.log(`[triage] LLM ok via gemini:${model}`);
+    return text;
+  } catch (e) {
+    console.log(`[triage] gemini ${model} threw: ${String(e).slice(0, 120)}`);
+    return null;
+  }
+}
+
+async function tryOpenAI(prompt: string): Promise<string | null> {
+  try {
+    const r = await fetch("https://api.openai.com/v1/chat/completions", {
+      method: "POST", signal: AbortSignal.timeout(9_000),
+      headers: { "content-type": "application/json", authorization: `Bearer ${process.env.OPENAI_API_KEY}` },
+      body: JSON.stringify({
+        model: "gpt-4o-mini", max_tokens: 500,
+        messages: [{ role: "user", content: prompt }],
+      }),
+    });
+    const j = await r.json();
+    if (j.error) { console.log(`[triage] openai error: ${j.error.message}`); return null; }
+    const text = j.choices?.[0]?.message?.content ?? null;
+    if (text) console.log("[triage] LLM ok via openai:gpt-4o-mini");
+    return text;
+  } catch { return null; }
+}
+
 async function callLLM(prompt: string): Promise<string | null> {
   const provider = process.env.LLM_PROVIDER ?? "";
   const timeout = AbortSignal.timeout(10_000);
+
+  /* Gemini's free tier returns transient 503 "high demand" and per-minute 429s.
+     A single model is therefore not dependable during a live demo, so walk a
+     chain of models and then cross over to OpenAI if a key is present, before
+     giving up and letting the caller use deterministic rules. */
+  if (provider === "gemini" && process.env.GEMINI_API_KEY) {
+    for (const model of ["gemini-flash-latest", "gemini-2.0-flash", "gemini-flash-lite-latest"]) {
+      const out = await tryGemini(model, prompt);
+      if (out) return out;
+    }
+    if (process.env.OPENAI_API_KEY) {
+      console.log("[triage] all gemini models failed, crossing over to openai");
+      return await tryOpenAI(prompt);
+    }
+    return null;
+  }
+
   try {
     if (provider === "anthropic" && process.env.ANTHROPIC_API_KEY) {
       const r = await fetch("https://api.anthropic.com/v1/messages", {
@@ -167,26 +230,9 @@ async function callLLM(prompt: string): Promise<string | null> {
       const j = await r.json();
       return j.choices?.[0]?.message?.content ?? null;
     }
-    if (provider === "gemini" && process.env.GEMINI_API_KEY) {
-      // gemini-flash-latest: the 2.5-* aliases 404 for accounts created after
-      // their cutoff, and 2.0-flash hits the free-tier per-minute cap fastest.
-      const r = await fetch(
-        "https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent",
-        {
-          method: "POST", signal: timeout,
-          headers: {
-            "content-type": "application/json",
-            "x-goog-api-key": process.env.GEMINI_API_KEY,
-          },
-          body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] }),
-        });
-      const j = await r.json();
-      if (j.error) { console.log(`[triage] gemini error ${j.error.code}: ${j.error.message}`); return null; }
-      // Thinking models can emit a thought part first, so take the first part
-      // that actually carries text rather than assuming index 0.
-      return j.candidates?.[0]?.content?.parts?.find((p: any) => p.text)?.text ?? null;
-    }
   } catch { return null; }
+  // No provider configured, or the configured one has no key: the caller falls
+  // back to deterministic rule triage, which is a supported operating mode.
   return null;
 }
 
