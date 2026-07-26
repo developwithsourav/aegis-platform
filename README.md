@@ -12,6 +12,24 @@ Early prototype (idea round): https://aegis-cchaos.netlify.app
 
 Venues already have police, medics and fire teams on site. What fails is information: delayed reporting, fragmented WhatsApp and walkie channels, duplicate unverified reports, no prioritization, slow dispatch. In a crowd crush or cardiac arrest the survivable window is **5 to 10 minutes**. Hathras 2024 (121 lives) and Bengaluru stadium 2025 (11 lives) both had staff on site. Neither had a shared live picture.
 
+## What about 112?
+
+**AEGIS is not a replacement for 112, and does not try to be.** India's ERSS
+already does the thing it is built for — a citizen in distress reaching the
+state emergency response system — and it does it with a call line, SMS, an app,
+a panic button and location sharing. Competing with that would be foolish.
+
+AEGIS is a different layer. 112 routes a citizen to a **state police control
+room**. It does not give the operator of a specific venue a live picture of
+*their own* venue, it does not dispatch *that venue's* marshals, medics and fire
+team, it does not merge thirty reports of one crush into a single incident, and
+it cannot broadcast exit guidance to everyone standing inside that venue.
+
+So: **AEGIS is the venue's internal operations layer, and it should escalate to
+112 rather than compete with it.** A stadium, a festival or a temple trust runs
+AEGIS for its own ground; anything beyond the venue's own capacity goes to ERSS.
+Formal 112 escalation is on the roadmap, not built.
+
 ## How it works
 
 ```

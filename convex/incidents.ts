@@ -78,9 +78,13 @@ export const submitReport = mutation({
     const twin = open.find((i) => i.zone === zone && now - i._creationTime < DEDUP_WINDOW_MS);
     if (twin) {
       await ctx.db.insert("reports", { ...args, zone, incidentId: twin._id });
+      // Corroboration rises because another independent person reported the
+      // same thing in the same place. Keep this the single source of the
+      // number so it stays explainable: 25 for one report, +20 per extra.
+      const merged = twin.reportCount + 1;
       await ctx.db.patch(twin._id, {
-        reportCount: twin.reportCount + 1,
-        confidence: Math.min(99, twin.confidence + 5),
+        reportCount: merged,
+        confidence: Math.min(90, 25 + (merged - 1) * 20),
       });
       await ctx.db.insert("events", {
         incidentId: twin._id,
@@ -123,10 +127,11 @@ export const applyTriage = internalMutation({
   handler: async (ctx, { incidentId, ...fields }) => {
     const inc = await ctx.db.get(incidentId);
     if (!inc) return;
+    // confidence already reflects corroboration (see ai.ts); do not inflate it
+    // again here, which previously double counted the merged reports.
     await ctx.db.patch(incidentId, {
       ...fields,
       status: inc.status === "ai_processing" ? "verified" : inc.status,
-      confidence: Math.min(99, fields.confidence + (inc.reportCount - 1) * 5),
     });
     await ctx.db.insert("events", {
       incidentId,

@@ -112,6 +112,18 @@ export const embedAllSops = action({
   },
 });
 
+/* CORROBORATION, not model confidence.
+   This used to be a number the LLM invented about itself, which is meaningless
+   — a blank photo scored 95% because the model was simply told a photo existed.
+   The only genuine evidence signal we have today is how many independent people
+   reported the same thing in the same place, so that is what this reports, and
+   the UI labels it as such.
+   Phase 2 replaces this with a calibrated probability from a trained classifier
+   evaluated on a held-out set. Until that exists, nothing here claims to be a
+   model confidence. */
+const corroboration = (reportCount: number) =>
+  Math.min(90, 25 + Math.max(0, reportCount - 1) * 20);
+
 function ruleTriage(category: string, description: string, zone: string) {
   let priority = 3;
   if (category === "crowd" || category === "fire") priority = 1;
@@ -131,7 +143,7 @@ function ruleTriage(category: string, description: string, zone: string) {
     summary: `${names[category] ?? category} reported at ${zone}.` +
       (description ? ` Reporter said: "${description}".` : "") +
       (priority === 1 ? " Golden window response required." : " Standard response."),
-    confidence: description ? 62 : 50,
+    confidence: corroboration(1),
   };
 }
 
@@ -274,7 +286,7 @@ ${sopDocs.map((d) => `[${d.source}] ${d.text}`).join("\n")}
 
 Return ONLY valid JSON, no markdown:
 {"priority": 1, "headline": "max 8 words: CATEGORY, zone", "summary": "2 sentences for the operator",
- "confidence": 80, "sopSteps": ["3 to 6 imperative steps taken only from the excerpts"], "sopSource": "source label"}
+ "sopSteps": ["3 to 6 imperative steps taken only from the excerpts"], "sopSource": "source label"}
 
 Priority rules: crowd crush, fire, cardiac or breathing = 1. Violence, injury, smoke = 2.
 Lost adult or minor hazard = 3. Complaints = 4. Lost child = 2.`;
@@ -288,7 +300,7 @@ Lost adult or minor hazard = 3. Complaints = 4. Lost child = 2.`;
           priority: Math.min(4, Math.max(1, Number(out.priority) || rules.priority)),
           headline: String(out.headline ?? rules.headline).slice(0, 80),
           summary: String(out.summary ?? rules.summary).slice(0, 400),
-          confidence: Math.min(99, Math.max(1, Number(out.confidence) || rules.confidence)),
+          confidence: corroboration(inc.reportCount),
           sopSteps: Array.isArray(out.sopSteps) && out.sopSteps.length
             ? out.sopSteps.map(String).slice(0, 6) : sopSteps.slice(0, 5),
           sopSource: String(out.sopSource ?? sopSource),
