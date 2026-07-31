@@ -4,7 +4,7 @@
 
 Built by **Team Ninja Coders** (Sourav Kumar · Manish Joshi · Siddharth Singh · Rajat Kushwaha, ARSD Delhi University) for the **Cognitive Chaos 2026 Finale** · Convex Open Innovation track · Microsoft Office Noida · 25 July 2026.
 
-Early prototype (idea round): https://aegis-cchaos.netlify.app
+prototype : https://490cbec14e504e7aa506bc0208460713.prod.enterapp.pro/
 
 ---
 
