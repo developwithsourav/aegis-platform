@@ -114,9 +114,7 @@ The code that was judged is frozen at the tag [`v1.0-hackathon`](https://github.
 
 | Member | Worked on |
 |---|---|
-| Sourav Kumar | Frontend, design system, pitch |
+| Sourav Kumar | Team leader, LLM, Frontend, system design, pitch |
 | Siddharth Singh | Convex data core: schema, deduplication, dispatch |
-| Rajat Kushwaha | AI triage, retrieval, LLM providers |
+| Rajat Kushwaha | AI triage, retrieval |
 | Manish Joshi | Integration, deployment, frontend to Convex bridge |
-
-ARSD College, University of Delhi.
