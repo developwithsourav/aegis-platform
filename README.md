@@ -1,95 +1,120 @@
-# AEGIS · AI Emergency Grid & Incident System
+# AEGIS
 
-**Every second saves a life.** AEGIS is an AI powered emergency operating system for mass gatherings. It turns every phone in a crowd into a sensor, triages reports with AI in about one second, and coordinates the nearest responder on a live command dashboard, with the reporter watching help approach in real time.
+AI Emergency Grid & Incident System, a venue operations prototype for crowd emergencies.
 
-Built by **Team Ninja Coders** (Sourav Kumar · Manish Joshi · Siddharth Singh · Rajat Kushwaha, ARSD Delhi University) for the **Cognitive Chaos 2026 Finale** · Convex Open Innovation track · Microsoft Office Noida · 25 July 2026.
+Someone inside a crowded venue taps SOS on their phone. AEGIS works out which zone they are in, scores how urgent it is, folds repeat reports of the same event into one incident, and puts it on the venue control room's live board so staff can send the nearest marshal, medic or fire team.
 
-prototype : https://490cbec14e504e7aa506bc0208460713.prod.enterapp.pro/
+Finalist at Cognitive Chaos 2026 (Convex Open Innovation track). The finale was held at Microsoft Office, Noida, on 25 July 2026. Built by Team Ninja Coders.
 
----
+**Live demo: https://developwithsourav.github.io/aegis-platform/**
 
-## Why
+![AEGIS command dashboard, reporter screen and guidance screen](docs/assets/gallery_aegis.png)
 
-Venues already have police, medics and fire teams on site. What fails is information: delayed reporting, fragmented WhatsApp and walkie channels, duplicate unverified reports, no prioritization, slow dispatch. In a crowd crush or cardiac arrest the survivable window is **5 to 10 minutes**. Hathras 2024 (121 lives) and Bengaluru stadium 2025 (11 lives) both had staff on site. Neither had a shared live picture.
+## Try it
+
+Open the demo in two tabs, or on a phone and a laptop.
+
+| Screen | Route | What to do |
+|---|---|---|
+| Reporter | [`#/`](https://developwithsourav.github.io/aegis-platform/#/) | Tap SOS, pick a category and a zone, submit |
+| Control room | [`#/command`](https://developwithsourav.github.io/aegis-platform/#/command) | Open the demo control room, select the incident, dispatch |
+| Responder | [`#/responder`](https://developwithsourav.github.io/aegis-platform/#/responder) | Use the demo unit, pick the unit that was dispatched, accept |
+
+The report reaches the board in about a second. Once a unit is dispatched, the reporter's screen shows who is coming and a live ETA, and none of the screens need a refresh.
+
+Anyone can open the demo, so it runs with some limits. Everything resets every hour. Only the last two digits of a callback number are stored, photo upload is off, exit guidance is limited to the preset messages, and reports are rate limited. The demo has no LLM key, so triage uses the rules and the guidance lookup. Please don't type real names or phone numbers into it.
+
+## The problem
+
+Venues already have police, medics and fire teams on site. What breaks down is information. Reports arrive late and get split across WhatsApp groups and walkie channels, one event gets reported thirty times, nothing is ranked by urgency, and dispatch is worked out by hand. In a crowd crush or a cardiac arrest, help still makes a difference for roughly 5 to 10 minutes. Hathras in 2024 (121 dead) and the Bengaluru stadium crush in 2025 (11 dead) both had staff on the ground, and neither had a shared live picture of what was happening.
+
+In a dense crowd you can't hear or be heard, and the mobile network jams. A tap is a few hundred bytes, so it gets through when a voice call won't.
 
 ## What about 112?
 
-**AEGIS is not a replacement for 112, and does not try to be.** India's ERSS
-already does the thing it is built for — a citizen in distress reaching the
-state emergency response system — and it does it with a call line, SMS, an app,
-a panic button and location sharing. Competing with that would be foolish.
+AEGIS does not replace 112. India's ERSS already connects a citizen to the state emergency system by call, SMS, app, panic button and location sharing.
 
-AEGIS is a different layer. 112 routes a citizen to a **state police control
-room**. It does not give the operator of a specific venue a live picture of
-*their own* venue, it does not dispatch *that venue's* marshals, medics and fire
-team, it does not merge thirty reports of one crush into a single incident, and
-it cannot broadcast exit guidance to everyone standing inside that venue.
-
-So: **AEGIS is the venue's internal operations layer, and it should escalate to
-112 rather than compete with it.** A stadium, a festival or a temple trust runs
-AEGIS for its own ground; anything beyond the venue's own capacity goes to ERSS.
-Formal 112 escalation is on the roadmap, not built.
+112 doesn't give one venue a live view of its own ground. It doesn't dispatch that venue's marshals and medics, merge thirty reports of one crush into a single incident, or push exit guidance to the people standing inside. AEGIS is built for that venue-level job, and anything beyond the venue's own capacity should go to 112. That escalation is on the roadmap and isn't built yet.
 
 ## How it works
 
 ```
-REPORT        one tap: category + photo + auto GPS + optional callback number. No login, no OTP.
-   |
-AI TRIAGE     LLM scores severity P1 to P4, merges duplicate reports, retrieves response steps
-   |          from real NDMA guidance (RAG). AI assists, humans decide. Rule fallback if AI is down.
-   |
-COORDINATE    live dashboard (operator login), role aware nearest dispatch,
-   |          live responder tracking with ETA, exit guidance broadcasts to every phone.
-   |
-LEARN         immutable audit timeline per incident.
+REPORT       One tap: category, zone (GPS or picked), optional note and callback number.
+    |        No login, no OTP.
+TRIAGE       Priority P1 to P4. Rules always run; an LLM can refine the summary when a key
+    |        is configured. Response steps are retrieved from NDMA and first aid guidance.
+DEDUPLICATE  Same category, same zone, within 2 minutes: merged into one incident with a
+    |        report count.
+DISPATCH     Nearest available unit whose role matches the category (medic for medical,
+    |        fire squad for fire). Live ETA for the reporter.
+ESCALATE     P1 incidents nobody has picked up after 60 seconds are escalated.
+    |
+AUDIT        Every step is written to an append-only timeline per incident.
 ```
+
+## Design decisions
+
+The percentage on an incident card measures corroboration. In the build that was judged, the LLM graded its own confidence and gave a blank photo 95%. The card now counts how many people independently reported the same thing in the same place, and says so.
+
+Dispatch picks the nearest available unit by distance. The AI suggests a priority and response steps, and an operator decides what to do with them.
+
+If the LLM fails or no key is set, triage falls back to the rules and keeps working.
+
+## Stack
+
+The backend runs on [Convex](https://convex.dev): reactive queries, mutations, scheduled functions, a cron job, vector search and file storage. The web app is a single static `index.html` (React with htm, no build step) served from GitHub Pages. Triage can use Gemini, OpenAI or Anthropic, with the rules as the fallback.
+
+The frontend that was judged had to be generated on EnterPro under the competition rules. That build is still up at https://490cbec14e504e7aa506bc0208460713.prod.enterapp.pro/
 
 ## Repository layout
 
 ```
-convex/               The entire backend (TypeScript on Convex)
-  schema.ts           7 tables + indexes + vector index
-  incidents.ts        ingestion with dedup, dispatch, tracking, lifecycle, login, broadcasts
-  ai.ts               AI triage action: provider switch (anthropic | openai | gemini) + rule fallback
-  seed.ts             demo venue, 5 responders, 14 NDMA derived SOPs
-  http.ts             REST bridge with CORS (Plan B for the EnterPro frontend)
-harness/index.html    dev client exercising every function (Reporter / Command / Responder tabs)
-docs/
-  AEGIS_MASTER_SPEC.md   the complete build spec (source of truth)
-  CONVEX_GUIDE.md        team tutorial: mental model, commands, gotchas
-  ENTERPRO_GUIDE.md      event day prompt pack + wiring plan for the EnterPro frontend
-  mockups/               approved UI designs (Guardian Red)
-.env.example          documented environment variables (no secrets in this repo)
+convex/
+  schema.ts          7 tables, indexes and a vector index
+  incidents.ts       intake, deduplication, dispatch, lifecycle, broadcasts, demo guards
+  ai.ts              triage: LLM provider switch and rules fallback, SOP retrieval
+  seed.ts            demo venue, 5 units, 14 SOPs drawn from NDMA guidance
+  venues.ts          venue catalogue and live venue switching
+  crons.ts           hourly reset for the public demo
+  http.ts            REST bridge with CORS
+reference-app/       the web app: reporter, responder and control room in one file
+harness/             developer client that exercises every function
+docs/                build spec, Convex guide, demo script, deck sources, screenshots
+AEGIS_Finale_Deck.*  the finale deck (PDF and editable PPTX)
+SUBMISSION.md        what was submitted and what the judges said
 ```
 
-The event day frontend is generated with **EnterPro** (competition requirement) from the prompts in `docs/ENTERPRO_GUIDE.md` and wired to this backend. The `harness/` client is a development tool and wiring reference, not the product UI.
-
-## Quickstart
+## Run it yourself
 
 ```bash
 npm install
-npx convex dev            # keeps the backend live and pushes functions on save
-npm run seed              # venue + responders + NDMA SOP knowledge base
-npm run harness           # dev client at http://localhost:4300
+npx convex dev          # creates a dev deployment and pushes functions on save
+npm run seed            # venue, units and the SOP knowledge base
+npm run app             # web app at http://localhost:4320
 ```
 
-No Convex account? Develop fully locally: `CONVEX_AGENT_MODE=anonymous npx convex dev`.
+Point `CONVEX_URL` near the top of `reference-app/index.html` at your own deployment.
 
-Open two browser windows on the harness: **Reporter** in one, **Command** in the other. The dashboard is gated by an operator login set via the `OPERATOR_EMAIL` / `OPERATOR_PASSWORD` environment variables on the deployment (never committed). Send a report and watch it appear, triage, merge duplicates, dispatch and track, live, no refresh.
+Environment variables live on the Convex deployment and never in this repo. See [`.env.example`](.env.example).
 
-Optional AI upgrade: set `LLM_PROVIDER` and the matching API key in the Convex dashboard (see `.env.example`). Without a key the deterministic triage + SOP lookup path runs, which is also our designed "AI unavailable" mode.
+| Variable | Purpose |
+|---|---|
+| `OPERATOR_EMAIL`, `OPERATOR_PASSWORD` | Control room login. With no password set, nobody can log in. |
+| `RESPONDER_PASSCODE` | Shared passcode for responder devices |
+| `LLM_PROVIDER` and the matching key | Turns on LLM triage. Leave empty for rules only. |
+| `DEMO_MODE=1` | Public demo limits and the hourly reset |
 
-## Verified end to end
+## The competition build
 
-Report ingestion with GPS to zone resolution · duplicate merge (category + zone within 120 s) · AI triage with NDMA grounded SOP steps · role aware nearest dispatch (fire team to fires, medics to medical) · 60 second P1 escalation timer · live responder tracking with ETA · operator login · exit guidance broadcast · full audit timeline.
+The code that was judged is frozen at the tag [`v1.0-hackathon`](https://github.com/developwithsourav/aegis-platform/tree/v1.0-hackathon). [`SUBMISSION.md`](SUBMISSION.md) records what ran on the day, what the judges criticised (photo upload on Android, the self-graded confidence score, the overlap with 112) and how each point was fixed afterwards.
 
 ## Team
 
-| Member | Lane |
+| Member | Worked on |
 |---|---|
-| Sourav Kumar | EnterPro frontend, design system, pitch |
-| Siddharth Singh | Convex data core: schema, dedup, dispatch |
-| Rajat Kushwaha | AI triage, RAG, LLM providers |
-| Manish Joshi | Integration, deployment, EnterPro to Convex bridge |
+| Sourav Kumar | Frontend, design system, pitch |
+| Siddharth Singh | Convex data core: schema, deduplication, dispatch |
+| Rajat Kushwaha | AI triage, retrieval, LLM providers |
+| Manish Joshi | Integration, deployment, frontend to Convex bridge |
 
-*AEGIS assists responders. It never replaces human judgment: the AI recommends, operators decide.*
+ARSD College, University of Delhi.

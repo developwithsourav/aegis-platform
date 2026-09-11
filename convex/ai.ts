@@ -1,4 +1,4 @@
-import { action, internalAction, internalMutation, internalQuery } from "./_generated/server";
+import { internalAction, internalMutation, internalQuery } from "./_generated/server";
 import { internal } from "./_generated/api";
 import { v } from "convex/values";
 
@@ -97,7 +97,7 @@ async function embed(text: string): Promise<number[] | null> {
 
 /* Run once after seeding: npx convex run ai:embedAllSops
    Safe to re-run; it simply recomputes every SOP vector. */
-export const embedAllSops = action({
+export const embedAllSops = internalAction({
   args: {},
   handler: async (ctx): Promise<{ embedded: number; failed: number }> => {
     const sops = await ctx.runQuery(internal.ai.listSopsForEmbedding, {});

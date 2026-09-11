@@ -1,9 +1,23 @@
 import { mutation, query, internalMutation } from "./_generated/server";
 import { internal } from "./_generated/api";
-import { v } from "convex/values";
+import { v, ConvexError } from "convex/values";
 
 const WALK_SPEED_M_PER_MIN = 84; // ~1.4 m/s
 const DEDUP_WINDOW_MS = 120_000;
+
+/* Public demo mode (DEMO_MODE=1 on the deployment). The live demo is open to
+   anyone with the link, so it keeps no real phone numbers, takes no photo
+   uploads, only lets the preset exit guidance go out to every screen, and
+   caps how fast reports can come in. Everything is wiped hourly (crons.ts). */
+const isDemo = () => process.env.DEMO_MODE === "1";
+const DEMO_REPORT_LIMIT = 40;          // reports ...
+const DEMO_REPORT_WINDOW_MS = 600_000; // ... per 10 minutes
+export const DEMO_BROADCASTS = [
+  "Evacuate via Gate 3B",
+  "Avoid the east concourse",
+  "Medical corridor in use — keep Gate 2 clear",
+];
+const maskPhone = (p: string) => p.replace(/\d(?=\d{2})/g, "X");
 
 function haversineMeters(aLat: number, aLng: number, bLat: number, bLng: number) {
   const R = 6371000;
@@ -20,7 +34,10 @@ export const etaMinutes = (meters: number) => Math.max(1, Math.round(meters / WA
 // ---------- photo upload ----------
 export const generateUploadUrl = mutation({
   args: {},
-  handler: async (ctx) => await ctx.storage.generateUploadUrl(),
+  handler: async (ctx) => {
+    if (isDemo()) throw new ConvexError("Photo upload is turned off in the public demo.");
+    return await ctx.storage.generateUploadUrl();
+  },
 });
 
 // ---------- report ingestion with dedup ----------
@@ -41,14 +58,22 @@ export const submitReport = mutation({
   handler: async (ctx, raw) => {
     // Normalize null -> undefined so the rest of the logic and the reports
     // insert (which uses the strict optional-number schema) stay clean.
+    const demo = isDemo();
+    if (demo) {
+      const recent = await ctx.db.query("reports").order("desc").take(DEMO_REPORT_LIMIT);
+      if (recent.length === DEMO_REPORT_LIMIT &&
+          Date.now() - recent[recent.length - 1]._creationTime < DEMO_REPORT_WINDOW_MS)
+        throw new ConvexError("The demo is busy. Try again in a few minutes.");
+    }
     const args = {
       category: raw.category,
       description: raw.description ?? undefined,
-      phone: raw.phone ?? undefined,
+      // In the public demo a real number is never stored, only its last two digits.
+      phone: raw.phone ? (demo ? maskPhone(raw.phone) : raw.phone) : undefined,
       lat: raw.lat ?? undefined,
       lng: raw.lng ?? undefined,
       zone: raw.zone ?? undefined,
-      photoId: raw.photoId ?? undefined,
+      photoId: demo ? undefined : raw.photoId ?? undefined,
     };
     // resolve zone: nearest venue gate if GPS given, else manual zone, else Unknown
     let zone = args.zone ?? "Unknown zone";
@@ -229,6 +254,8 @@ export const resolve = mutation({
 export const sendBroadcast = mutation({
   args: { message: v.string() },
   handler: async (ctx, { message }) => {
+    if (isDemo() && !DEMO_BROADCASTS.includes(message))
+      throw new ConvexError("The public demo only sends the preset messages.");
     for (const b of await ctx.db.query("broadcasts").collect())
       await ctx.db.patch(b._id, { active: false });
     await ctx.db.insert("broadcasts", { message, active: true });
@@ -268,6 +295,13 @@ export const responderLogin = query({
     if (!expected) return { ok: false };
     return passcode === expected ? { ok: true } : { ok: false };
   },
+});
+
+/* The logins above gate screens, not data. In the public demo there is nothing
+   private behind them, so the UI offers a one-click way in instead. */
+export const demoInfo = query({
+  args: {},
+  handler: async () => ({ demo: isDemo(), broadcasts: DEMO_BROADCASTS }),
 });
 
 // ---------- live queries ----------

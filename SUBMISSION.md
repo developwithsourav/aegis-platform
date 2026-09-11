@@ -20,7 +20,7 @@ git checkout main                # ongoing development
 | Event | Cognitive Chaos 2026 Finale, Microsoft Office Sovereign Noida |
 | Date | 25 July 2026 |
 | Track | Convex — Open Innovation (self proposed problem) |
-| Result | Reached the final rounds. Did not win. |
+| Result | Finalist |
 
 ## What was live on the day
 
@@ -57,13 +57,6 @@ local build against the same live Convex backend, which never went down.
 3. **112 already covers this.** India's ERSS has a call line, SMS, an app and
    location sharing, and the pitch did not draw a clear line between the two.
 
-All three are addressed on `main` from commit `f525ae5` onward. The tagged
-submission deliberately still contains them, because that is what was judged.
-
-## Where it goes next
-
-`main` continues as a personal project: migrating off Convex and EnterPro onto
-a self hosted FastAPI and Postgres stack, replacing the fabricated confidence
-with a trained classifier evaluated on a held out set, and repositioning as a
-venue operations layer that escalates to 112 rather than competing with it.
-See `ROADMAP.md`.
+All three are fixed on `main`, starting with the commit "Fix the three
+problems the finale judges found". The tagged submission still has them on
+purpose, because that is what was judged.

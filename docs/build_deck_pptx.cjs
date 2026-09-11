@@ -2,7 +2,7 @@
    13.33 x 7.5in. One vertical rhythm, cards sized to content, images large. */
 const P = require("pptxgenjs");
 const d = new P();
-const A = "G:/Claude/aegis-platform/docs/assets/";
+const A = require("path").join(__dirname, "assets") + "/";
 const LIVE = "https://490cbec14e504e7aa506bc0208460713.prod.enterapp.pro";
 
 d.layout = "LAYOUT_WIDE";
@@ -85,7 +85,7 @@ function stat(s, x, y, w, num, lines, color) {
   const col = [M+0.28, 3.35, 6.20];
   ["TEAM","EVENT","TRACK"].forEach((t,i)=>lab(s, t, col[i], 4.48, EMBER, 3));
   s.addText("Ninja Coders",        { x:col[0], y:4.70, w:2.8, h:0.3, fontFace:"Calibri", fontSize:12.5, color:INK, bold:true, margin:0 });
-  s.addText("Cognitive Chaos 2026",   { x:col[1], y:4.70, w:2.8, h:0.3, fontFace:"Calibri", fontSize:12.5, color:INK, bold:true, margin:0 });
+  s.addText("Cognitive Chaos 2026", { x:col[1], y:4.70, w:2.8, h:0.3, fontFace:"Calibri", fontSize:12.5, color:INK, bold:true, margin:0 });
   s.addText("Convex — Open Innovation (self-proposed problem)",
     { x:col[2], y:4.70, w:6.3, h:0.3, fontFace:"Calibri", fontSize:12.5, color:INK, bold:true, margin:0 });
 
@@ -395,5 +395,5 @@ function stat(s, x, y, w, num, lines, color) {
     { x:M, y:6.62, w:CW, h:0.26, fontFace:"Calibri", fontSize:9.5, color:MUTE, align:"center", margin:0 });
 }
 
-d.writeFile({ fileName:"G:/Claude/aegis-platform/AEGIS_Finale_Deck.pptx" })
+d.writeFile({ fileName:require("path").join(__dirname, "..", "AEGIS_Finale_Deck.pptx") })
  .then(f => console.log("written:", f));

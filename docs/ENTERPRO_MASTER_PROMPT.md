@@ -12,7 +12,7 @@ Re-prompting to move a button is the fastest way to burn 4,000 credits. If
 something is structurally wrong, prompt only for that one route.
 
 **Live credentials** (do not put them in the prompt — type them at runtime):
-operator `operator` and the responder passcode are both in team chat — never in this repo
+the operator login and the responder passcode live in the deployment environment, never in this repo
 
 ---
 

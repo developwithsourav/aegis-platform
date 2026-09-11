@@ -20,7 +20,7 @@ Reference only: strategy, the REST fallback contract, and credit guardrails.
 | Convex deployment | `judicious-oyster-529` |
 | **WebSocket URL** (use this for real-time) | `https://judicious-oyster-529.convex.cloud` |
 | **REST URL** (fallback only) | `https://judicious-oyster-529.convex.site` |
-| Operator login | `operator` / *(private — see team chat, not in this repo)* |
+| Operator login | operator ID and password, set as deployment environment variables (never in this repo) |
 
 Seeded and live: 1 venue (7 gates), 5 responders, 14 NDMA/Red-Cross SOP protocols.
 

@@ -1,4 +1,4 @@
-import { mutation } from "./_generated/server";
+import { internalMutation } from "./_generated/server";
 
 /* Alternate venue: Central Delhi VVIP / mass-gathering zone.
    Demonstrates that AEGIS is not hardcoded to one site — the venue, its zones
@@ -59,7 +59,7 @@ const RESPONDERS = [
   { code: "MRS-CP", name: "Marshal Unit, Connaught Place", role: "marshal", lat: 28.6318, lng: 77.2172 },
 ];
 
-export const all = mutation({
+export const all = internalMutation({
   args: {},
   handler: async (ctx) => {
     // Replace venue + responders only. The SOP knowledge base is venue

@@ -1,4 +1,4 @@
-import { mutation } from "./_generated/server";
+import { internalMutation, type MutationCtx } from "./_generated/server";
 
 /* One time demo seeding: venue (Microsoft Office Noida area), 5 responders,
    SOP knowledge base distilled from NDMA "Managing Crowd at Events" guidance,
@@ -48,7 +48,9 @@ const SOPS = [
   { category: "other", title: "Escalate missing child", text: "If a missing child is not located within ten minutes, escalate to the police liaison and initiate gate checks.", source: SRC_CROWD },
 ];
 
-export const all = mutation({
+/* Internal, so they run from `npx convex run` but a visitor to the public demo
+   cannot wipe the knowledge base from a browser console. */
+export const all = internalMutation({
   args: {},
   handler: async (ctx) => {
     for (const t of ["venue", "responders", "sops"] as const)
@@ -61,13 +63,24 @@ export const all = mutation({
   },
 });
 
-export const resetIncidents = mutation({
+async function wipeIncidents(ctx: MutationCtx) {
+  for (const r of await ctx.db.query("reports").collect())
+    if (r.photoId) await ctx.storage.delete(r.photoId);
+  for (const t of ["incidents", "reports", "events", "broadcasts"] as const)
+    for (const row of await ctx.db.query(t).collect()) await ctx.db.delete(row._id);
+  for (const r of await ctx.db.query("responders").collect())
+    await ctx.db.patch(r._id, { available: true });
+  return "clean";
+}
+
+export const resetIncidents = internalMutation({
   args: {},
-  handler: async (ctx) => {
-    for (const t of ["incidents", "reports", "events", "broadcasts"] as const)
-      for (const row of await ctx.db.query(t).collect()) await ctx.db.delete(row._id);
-    for (const r of await ctx.db.query("responders").collect())
-      await ctx.db.patch(r._id, { available: true });
-    return "clean";
-  },
+  handler: wipeIncidents,
+});
+
+/* Hourly wipe for the public demo (crons.ts). Does nothing unless DEMO_MODE=1,
+   so a real deployment never loses its incident history to a timer. */
+export const demoReset = internalMutation({
+  args: {},
+  handler: async (ctx) => (process.env.DEMO_MODE === "1" ? wipeIncidents(ctx) : "skipped"),
 });

@@ -10,11 +10,13 @@ from reportlab.lib.styles import ParagraphStyle
 from reportlab.platypus import Paragraph
 from reportlab.lib.utils import ImageReader
 from reportlab.lib.enums import TA_LEFT, TA_CENTER, TA_RIGHT
+import os
 
 IN = 72.0
 W, H = 13.33 * IN, 7.5 * IN
-A = "G:/Claude/aegis-platform/docs/assets/"
-OUT = "G:/Claude/aegis-platform/AEGIS_Finale_Deck.pdf"
+HERE = os.path.dirname(os.path.abspath(__file__))
+A = os.path.join(HERE, "assets") + os.sep
+OUT = os.path.join(HERE, "..", "AEGIS_Finale_Deck.pdf")
 LIVE = "https://490cbec14e504e7aa506bc0208460713.prod.enterapp.pro"
 
 PAPER = HexColor("#FBF9F4"); PANEL = HexColor("#F3EFE6"); INK = HexColor("#26241E")

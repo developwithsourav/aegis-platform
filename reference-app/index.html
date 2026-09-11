@@ -283,7 +283,7 @@ const h = (type, props, ...kids) => {
 const html = htm.bind(h);
 
 /* ═══════════ backend adapter — the ONLY place that touches data ═══════════ */
-const CONVEX_URL = "https://judicious-oyster-529.convex.cloud";
+const CONVEX_URL = "https://beloved-malamute-462.convex.cloud";
 const client = new ConvexClient(CONVEX_URL);
 const api = anyApi;
 
@@ -308,7 +308,9 @@ const F = {
   venue:      api.incidents.venueInfo,
   track:      api.incidents.trackIncident,
   detail:     api.incidents.incidentDetail,
+  demo:       api.incidents.demoInfo,
 };
+const useDemo       = ()   => (useLive(F.demo) || {}).demo === true;
 const useBoard      = ()   => useLive(F.board);
 const useBroadcast  = ()   => useLive(F.broadcast);
 const useResponders = ()   => useLive(F.responders);
@@ -440,8 +442,10 @@ function Reporter() {
   const [incId, setIncId] = useState(null);
   const [merged, setMerged] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [sendErr, setSendErr] = useState("");
   const venue = useVenue();
   const track = useTrack(incId);
+  const demo = useDemo();
 
   useEffect(() => {
     if (screen === "submitting" && track && track.status !== "ai_processing") setScreen("track");
@@ -460,13 +464,17 @@ function Reporter() {
   }, [pos, venue, zone]);
 
   async function send() {
-    setBusy(true);
-    const r = await submitReport({
-      category: cat, description: desc || undefined, phone: phone.trim() || undefined,
-      lat: pos ? pos.lat : undefined, lng: pos ? pos.lng : undefined,
-      zone: pos ? undefined : (zone || undefined), photoId: photoId || undefined,
-    });
-    setIncId(r.incidentId); setMerged(r.merged); setBusy(false); setScreen("submitting");
+    setBusy(true); setSendErr("");
+    try {
+      const r = await submitReport({
+        category: cat, description: desc || undefined, phone: phone.trim() || undefined,
+        lat: pos ? pos.lat : undefined, lng: pos ? pos.lng : undefined,
+        zone: pos ? undefined : (zone || undefined), photoId: photoId || undefined,
+      });
+      setIncId(r.incidentId); setMerged(r.merged); setScreen("submitting");
+    } catch (e) {
+      setSendErr((e && e.data) || "Could not send the report. Try again.");
+    } finally { setBusy(false); }
   }
 
   /* ---- 1. HOME (dark) ---- */
@@ -478,6 +486,7 @@ function Reporter() {
         <div class="right"><button aria-label="Notifications"><${Icon} d=${I.bell} s=${19}/></button></div>
       </div>
       <${BroadcastBar}/>
+      ${demo && html`<${DemoNote}/>`}
       <div class="hero">
         <${Icon} d=${I.shield} s=${62} w=${1.4} class="shield" style=${{color:"var(--red)"}}/>
         <h1>AEGIS</h1>
@@ -544,7 +553,7 @@ function Reporter() {
           <div class="counter" style="text-align:left">
             Only used to call you back. Skip it — it never delays your report.</div>
         </div>
-        <div class="field">
+        ${!demo && html`<div class="field">
           <span class="lbl">Add Photo <span style="text-transform:none;letter-spacing:0">(Optional)</span></span>
           <div class="photorow">
             ${photo && html`<img src=${photo} alt="Attached"/>`}
@@ -559,7 +568,7 @@ function Reporter() {
                   setPhoto(URL.createObjectURL(f)); setPhotoId(await uploadPhoto(f)); }}/>
             </label>
           </div>
-        </div>
+        </div>`}
         <div class="field">
           <span class="lbl">Callback number <span style="text-transform:none;letter-spacing:0">(Optional)</span></span>
           <input class="inp" type="tel" inputMode="numeric" maxlength="10" value=${phone}
@@ -570,6 +579,7 @@ function Reporter() {
         </div>
         <button class="btn" disabled=${!cat || busy} onClick=${send}>
           ${busy ? "SENDING…" : "SUBMIT REPORT"}</button>
+        ${sendErr && html`<p class="err">${sendErr}</p>`}
       </div>
     <//>`;
 
@@ -673,6 +683,11 @@ function Reporter() {
       </div>
     <//>`;
 }
+function DemoNote() {
+  return html`<div class="banner" style="background:#26241E;color:#F3EFE6">
+    <span>Public demo. Everything resets every hour. Don't type real names or numbers:
+    only the last two digits of a callback number are kept.</span></div>`;
+}
 function BroadcastBar() {
   const b = useBroadcast();
   return b ? html`<div class="banner"><${Icon} d=${I.bell} s=${17}/><span>${b.message}</span></div>` : null;
@@ -687,6 +702,7 @@ function Responder() {
   const [sim, setSim] = useState(false);
   const responders = useResponders();
   const board = useBoard();
+  const demo = useDemo();
 
   const unit = (responders || []).find((r) => r._id === unitId);
   const job = (board || []).find((i) => i.responder && unit &&
@@ -710,6 +726,8 @@ function Responder() {
           onChange=${(e) => setPass(e.target.value)}
           onKeyDown=${(e) => e.key === "Enter" && go()}/>
         <button class="btn" style="margin-top:12px" onClick=${go}>ENTER</button>
+        ${demo && html`<button class="btn green" style="margin-top:9px"
+          onClick=${() => { localStorage.setItem("aegis_resp", "1"); setOk(true); }}>TRY THE DEMO UNIT</button>`}
         ${err && html`<p class="err">${err}</p>`}
       </div></div></div>
     <//>`;
@@ -785,6 +803,7 @@ function Command() {
   const responders = useResponders();
   const venue = useVenue();
   const detail = useDetail(sel);
+  const demo = useDemo();
   // Any of the merged reports may carry a callback number; show the first.
   const callback = detail && (detail.reports || []).map((r) => r.phone).find(Boolean);
 
@@ -794,10 +813,13 @@ function Command() {
         <${Icon} d=${I.shield} s=${34} style=${{color:"var(--red)"}}/>
         <h3 style="margin-top:12px">AEGIS Command</h3>
         <p class="muted" style="margin-bottom:17px">Authorized venue operators only.</p>
-        <input class="inp" style="margin-bottom:9px" value=${email} onChange=${(e) => setEmail(e.target.value)}/>
+        <input class="inp" style="margin-bottom:9px" placeholder="Operator ID" value=${email}
+          onChange=${(e) => setEmail(e.target.value)}/>
         <input class="inp" type="password" placeholder="Password" value=${pw}
           onChange=${(e) => setPw(e.target.value)} onKeyDown=${(e) => e.key === "Enter" && go()}/>
         <button class="btn" style="margin-top:12px" onClick=${go}>LOG IN</button>
+        ${demo && html`<button class="btn green" style="margin-top:9px"
+          onClick=${() => { localStorage.setItem("aegis_op", "1"); setOk(true); }}>OPEN THE DEMO CONTROL ROOM</button>`}
         ${err && html`<p class="err">${err}</p>`}
       </div></div></div>
     <//>`;
@@ -966,8 +988,10 @@ function Command() {
 
               <div style="margin-top:16px;padding-top:14px;border-top:1px solid var(--dline)">
                 <span class="lbl">Exit guidance broadcast</span>
-                <input class="inp" style="margin-top:8px" placeholder="Message to every phone on site…"
-                  value=${msg} onChange=${(e) => setMsg(e.target.value)}/>
+                ${demo
+                  ? html`<p class="muted" style="font-size:12px;margin-top:8px">Pick a preset. Free text is off in the public demo.</p>`
+                  : html`<input class="inp" style="margin-top:8px" placeholder="Message to every phone on site…"
+                  value=${msg} onChange=${(e) => setMsg(e.target.value)}/>`}
                 <div class="tmpl">
                   ${["Evacuate via Gate 3B","Avoid the east concourse","Medical corridor in use — keep Gate 2 clear"]
                     .map((t) => html`<button key=${t} onClick=${() => setMsg(t)}>${t}</button>`)}
