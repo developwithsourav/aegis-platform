@@ -2,9 +2,8 @@ import { httpRouter } from "convex/server";
 import { httpAction } from "./_generated/server";
 import { api } from "./_generated/api";
 
-/* Plan B bridge for the EnterPro frontend (if the convex npm client cannot be
-   installed inside the EnterPro project): plain REST endpoints + polling.
-   Base URL: <deployment>.convex.site (cloud) or the local backend /http port. */
+/* Plain REST endpoints for clients that cannot use the Convex client library
+   and poll instead of subscribing. Base URL: https://<deployment>.convex.site */
 
 const cors = {
   "Access-Control-Allow-Origin": "*",

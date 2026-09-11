@@ -1,31 +1,12 @@
-import { internalMutation, type MutationCtx } from "./_generated/server";
+import { internalMutation } from "./_generated/server";
+import { installVenue, clearIncidents } from "./venues";
 
-/* One time demo seeding: venue (Microsoft Office Noida area), 5 responders,
-   SOP knowledge base distilled from NDMA "Managing Crowd at Events" guidance,
-   fire safety and first aid guidance (team curated excerpts of public documents).
-   Run: npx convex run seed:all */
+/* Seed data and resets. All of these are internal functions: they run from the
+   command line (`npx convex run seed:all`) and cannot be called from a browser.
 
-const VENUE = {
-  name: "Microsoft Office, Sovereign Noida (demo venue)",
-  centerLat: 28.5355, centerLng: 77.3910, zoomLevel: 17,
-  gates: [
-    { name: "Gate 1", lat: 28.5361, lng: 77.3899, isExit: true },
-    { name: "Gate 2", lat: 28.5347, lng: 77.3901, isExit: false },
-    { name: "Gate 3", lat: 28.5349, lng: 77.3921, isExit: true },
-    { name: "Gate 3B", lat: 28.5352, lng: 77.3928, isExit: true },
-    { name: "Main Stage", lat: 28.5356, lng: 77.3912, isExit: false },
-    { name: "Food Court", lat: 28.5362, lng: 77.3918, isExit: false },
-    { name: "Medical Post", lat: 28.5359, lng: 77.3925, isExit: false },
-  ],
-};
-
-const RESPONDERS = [
-  { code: "E-02", name: "Medic Team 2", role: "medic", lat: 28.5359, lng: 77.3925 },
-  { code: "E-05", name: "Medic Team 5", role: "medic", lat: 28.5362, lng: 77.3918 },
-  { code: "M-07", name: "Marshal 7", role: "marshal", lat: 28.5349, lng: 77.3921 },
-  { code: "F-12", name: "Fire Squad 12", role: "fire", lat: 28.5347, lng: 77.3901 },
-  { code: "S-04", name: "Security 4", role: "security", lat: 28.5361, lng: 77.3899 },
-];
+   The response procedures below are short excerpts the team condensed from
+   public NDMA crowd management and fire safety guidance and Indian Red Cross
+   first aid guidance. */
 
 const SRC_CROWD = "NDMA, Managing Crowd at Events and Venues of Mass Gathering (team curated excerpt)";
 const SRC_FIRE = "NDMA fire safety guidance (team curated excerpt)";
@@ -48,39 +29,31 @@ const SOPS = [
   { category: "other", title: "Escalate missing child", text: "If a missing child is not located within ten minutes, escalate to the police liaison and initiate gate checks.", source: SRC_CROWD },
 ];
 
-/* Internal, so they run from `npx convex run` but a visitor to the public demo
-   cannot wipe the knowledge base from a browser console. */
+/** Demo venue, its five responders and the procedure library. Safe to re-run. */
 export const all = internalMutation({
   args: {},
   handler: async (ctx) => {
-    for (const t of ["venue", "responders", "sops"] as const)
-      for (const row of await ctx.db.query(t).collect()) await ctx.db.delete(row._id);
-    await ctx.db.insert("venue", VENUE);
-    for (const r of RESPONDERS)
-      await ctx.db.insert("responders", { ...r, available: true, lastSeen: Date.now() });
-    for (const s of SOPS) await ctx.db.insert("sops", s);
-    return { venue: 1, responders: RESPONDERS.length, sops: SOPS.length };
+    const responders = await installVenue(ctx, "noida_msoffice");
+    for (const sop of await ctx.db.query("sops").collect()) await ctx.db.delete(sop._id);
+    for (const sop of SOPS) await ctx.db.insert("sops", sop);
+    return { venue: 1, responders, sops: SOPS.length };
   },
 });
 
-async function wipeIncidents(ctx: MutationCtx) {
-  for (const r of await ctx.db.query("reports").collect())
-    if (r.photoId) await ctx.storage.delete(r.photoId);
-  for (const t of ["incidents", "reports", "events", "broadcasts"] as const)
-    for (const row of await ctx.db.query(t).collect()) await ctx.db.delete(row._id);
-  for (const r of await ctx.db.query("responders").collect())
-    await ctx.db.patch(r._id, { available: true });
-  return "clean";
-}
-
 export const resetIncidents = internalMutation({
   args: {},
-  handler: wipeIncidents,
+  handler: async (ctx) => {
+    await clearIncidents(ctx);
+    return "clean";
+  },
 });
 
-/* Hourly wipe for the public demo (crons.ts). Does nothing unless DEMO_MODE=1,
-   so a real deployment never loses its incident history to a timer. */
+/** Hourly wipe for the public demo (see crons.ts). Does nothing unless DEMO_MODE=1. */
 export const demoReset = internalMutation({
   args: {},
-  handler: async (ctx) => (process.env.DEMO_MODE === "1" ? wipeIncidents(ctx) : "skipped"),
+  handler: async (ctx) => {
+    if (process.env.DEMO_MODE !== "1") return "skipped";
+    await clearIncidents(ctx);
+    return "clean";
+  },
 });

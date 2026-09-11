@@ -1,20 +1,25 @@
 import { internalAction, internalMutation, internalQuery } from "./_generated/server";
 import { internal } from "./_generated/api";
 import { v } from "convex/values";
+import { corroboration } from "./model";
 
-/* AI triage. Works in three modes:
-   1. LLM_PROVIDER=anthropic|openai|gemini with a key: full LLM triage grounded in SOPs.
-   2. No key set: deterministic rule based triage + SOP lookup by category.
-      The demo works end to end with zero API keys (judged edge case: AI fails => manual mode).
-   SOP retrieval uses vector search when embeddings exist, else the category index. */
+/* Triage.
+   Rules always produce a priority, headline and summary. When LLM_PROVIDER
+   (anthropic, openai or gemini) and its key are set, an LLM rewrites them using
+   only the retrieved procedures, and the rules remain the fallback if the call
+   fails. With no key at all the system still works end to end.
+   Procedures are found by vector search when embeddings exist, otherwise by
+   category. */
 
 export const getForTriage = internalQuery({
   args: { incidentId: v.id("incidents") },
   handler: async (ctx, { incidentId }) => {
     const inc = await ctx.db.get(incidentId);
     if (!inc) return null;
-    const report = await ctx.db.query("reports")
-      .filter((q) => q.eq(q.field("incidentId"), incidentId)).first();
+    const report = await ctx.db
+      .query("reports")
+      .withIndex("by_incident", (q) => q.eq("incidentId", incidentId))
+      .first();
     return { inc, description: report?.description ?? "", hasPhoto: !!report?.photoId };
   },
 });
@@ -112,18 +117,8 @@ export const embedAllSops = internalAction({
   },
 });
 
-/* CORROBORATION, not model confidence.
-   This used to be a number the LLM invented about itself, which is meaningless
-   — a blank photo scored 95% because the model was simply told a photo existed.
-   The only genuine evidence signal we have today is how many independent people
-   reported the same thing in the same place, so that is what this reports, and
-   the UI labels it as such.
-   Phase 2 replaces this with a calibrated probability from a trained classifier
-   evaluated on a held-out set. Until that exists, nothing here claims to be a
-   model confidence. */
-const corroboration = (reportCount: number) =>
-  Math.min(90, 25 + Math.max(0, reportCount - 1) * 20);
-
+/* Deterministic triage. Rules may raise urgency on keywords that suggest a
+   life-threatening case (breathing, cardiac, bleeding, a child). */
 function ruleTriage(category: string, description: string, zone: string) {
   let priority = 3;
   if (category === "crowd" || category === "fire") priority = 1;

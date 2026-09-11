@@ -22,7 +22,7 @@ Open the demo in two tabs, or on a phone and a laptop.
 
 The report reaches the board in about a second. Once a unit is dispatched, the reporter's screen shows who is coming and a live ETA, and none of the screens need a refresh.
 
-Anyone can open the demo, so it runs with some limits. Everything resets every hour. Only the last two digits of a callback number are stored, photo upload is off, exit guidance is limited to the preset messages, and reports are rate limited. The demo has no LLM key, so triage uses the rules and the guidance lookup. Please don't type real names or phone numbers into it.
+Anyone can open the demo, so it runs with some limits. Everything resets every hour. Only the last two digits of a callback number are stored, photo upload is off, exit guidance is limited to the preset messages, and reports are rate limited. When no LLM key is configured, triage uses the rules and the guidance lookup. Please don't type real names or phone numbers into it.
 
 ## The problem
 
@@ -30,7 +30,7 @@ Venues already have police, medics and fire teams on site. What breaks down is i
 
 In a dense crowd you can't hear or be heard, and the mobile network jams. A tap is a few hundred bytes, so it gets through when a voice call won't.
 
-## What about 112?
+## AEGIS and 112
 
 AEGIS does not replace 112. India's ERSS already connects a citizen to the state emergency system by call, SMS, app, panic button and location sharing.
 
@@ -52,36 +52,38 @@ ESCALATE     P1 incidents nobody has picked up after 60 seconds are escalated.
 AUDIT        Every step is written to an append-only timeline per incident.
 ```
 
-## Design decisions
+The percentage on an incident card measures corroboration: 25 for one report and 20 more for each independent report of the same thing in the same place. In the build that was judged, the LLM graded its own confidence and gave a blank photo 95%, so the card no longer shows a model score.
 
-The percentage on an incident card measures corroboration. In the build that was judged, the LLM graded its own confidence and gave a blank photo 95%. The card now counts how many people independently reported the same thing in the same place, and says so.
+Dispatch is a distance calculation. The AI suggests a priority and response steps, and an operator decides what to do with them. If the LLM call fails or no key is set, triage falls back to the rules and keeps working.
 
-Dispatch picks the nearest available unit by distance. The AI suggests a priority and response steps, and an operator decides what to do with them.
+## Reading the code
 
-If the LLM fails or no key is set, triage falls back to the rules and keeps working.
+The backend is about 1,100 lines of TypeScript in eight files, and the web app is one HTML page of about 1,000 lines. A good order to read it in:
+
+1. [`convex/schema.ts`](convex/schema.ts): the seven tables. Start here to see what the system stores.
+2. [`convex/incidents.ts`](convex/incidents.ts): `submitReport` is the core path. It locates the report, merges it with an open incident or opens a new one, and schedules triage and escalation. Dispatch and the rest of the lifecycle follow.
+3. [`convex/ai.ts`](convex/ai.ts): `triage` retrieves procedures, runs the rules, optionally asks an LLM, and writes the result back.
+4. [`convex/model.ts`](convex/model.ts): distance, ETA, corroboration and the category-to-role map, with no database access.
+5. [`convex/venues.ts`](convex/venues.ts) and [`convex/seed.ts`](convex/seed.ts): venue data, the procedure library and resets.
+6. [`web/index.html`](web/index.html): the reporter, responder and control room screens. Every call to the backend is in the adapter block near the top of the script.
 
 ## Stack
 
 The backend runs on [Convex](https://convex.dev): reactive queries, mutations, scheduled functions, a cron job, vector search and file storage. The web app is a single static `index.html` (React with htm, no build step) served from GitHub Pages. Triage can use Gemini, OpenAI or Anthropic, with the rules as the fallback.
 
-The frontend that was judged had to be generated on EnterPro under the competition rules. That build is still up at https://490cbec14e504e7aa506bc0208460713.prod.enterapp.pro/
-
-## Repository layout
-
 ```
 convex/
-  schema.ts          7 tables, indexes and a vector index
-  incidents.ts       intake, deduplication, dispatch, lifecycle, broadcasts, demo guards
-  ai.ts              triage: LLM provider switch and rules fallback, SOP retrieval
-  seed.ts            demo venue, 5 units, 14 SOPs drawn from NDMA guidance
-  venues.ts          venue catalogue and live venue switching
-  crons.ts           hourly reset for the public demo
-  http.ts            REST bridge with CORS
-reference-app/       the web app: reporter, responder and control room in one file
-harness/             developer client that exercises every function
-docs/                build spec, Convex guide, demo script, deck sources, screenshots
-AEGIS_Finale_Deck.*  the finale deck (PDF and editable PPTX)
-SUBMISSION.md        what was submitted and what the judges said
+  schema.ts       tables and indexes
+  incidents.ts    reporting, deduplication, dispatch, lifecycle, broadcasts, live queries
+  ai.ts           triage and procedure retrieval
+  model.ts        pure helpers
+  venues.ts       venue catalogue and switching
+  seed.ts         seed data and resets
+  crons.ts        hourly reset for the public demo
+  http.ts         REST endpoints for clients that can't use the Convex library
+web/index.html    the web app
+docs/             finale deck and screenshots
+SUBMISSION.md     the competition record
 ```
 
 ## Run it yourself
@@ -89,13 +91,13 @@ SUBMISSION.md        what was submitted and what the judges said
 ```bash
 npm install
 npx convex dev          # creates a dev deployment and pushes functions on save
-npm run seed            # venue, units and the SOP knowledge base
+npm run seed            # venue, units and the procedure library
 npm run app             # web app at http://localhost:4320
 ```
 
-Point `CONVEX_URL` near the top of `reference-app/index.html` at your own deployment.
+Point `CONVEX_URL` near the top of `web/index.html` at your own deployment. `npm run typecheck` checks the backend.
 
-Environment variables live on the Convex deployment and never in this repo. See [`.env.example`](.env.example).
+Settings live in environment variables on the Convex deployment, never in this repo. See [`.env.example`](.env.example).
 
 | Variable | Purpose |
 |---|---|
@@ -106,7 +108,7 @@ Environment variables live on the Convex deployment and never in this repo. See 
 
 ## The competition build
 
-The code that was judged is frozen at the tag [`v1.0-hackathon`](https://github.com/developwithsourav/aegis-platform/tree/v1.0-hackathon). [`SUBMISSION.md`](SUBMISSION.md) records what ran on the day, what the judges criticised (photo upload on Android, the self-graded confidence score, the overlap with 112) and how each point was fixed afterwards.
+The code that was judged is frozen at the tag [`v1.0-hackathon`](https://github.com/developwithsourav/aegis-platform/tree/v1.0-hackathon), along with the working material from the event. [`SUBMISSION.md`](SUBMISSION.md) records what ran on the day, what the judges criticised and how each point was fixed. The finale deck is in [`docs/AEGIS_Finale_Deck.pdf`](docs/AEGIS_Finale_Deck.pdf).
 
 ## Team
 

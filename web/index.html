@@ -1,7 +1,7 @@
 <!doctype html>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>AEGIS — Emergency Response</title>
+<title>AEGIS | Emergency Response</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text y='26' font-size='26'>🛡</text></svg>">
 <style>
 /* ============ Guardian Red design system ============ */
@@ -10,9 +10,9 @@
   --bg:#FFFFFF; --panel:#F7F8FA; --line:#E8E9EC; --ink:#0A0A0C; --mut:#6B6C72;
   --red:#E11D2E; --red-d:#B3121F; --softred:#FDECEE;
   --green:#22C55E; --amber:#F59E0B;
-  /* operational surface — LIGHT everywhere now. Command/Responder are white too:
-     a dark dashboard washes out on a bright-hall projector; white stays crisp.
-     Page is a hair grey so white cards lift off it. */
+  /* operational surface for the responder and command screens. Kept light because
+     a dark dashboard washes out on a projector in a bright hall. The page is a
+     touch grey so white cards stand off it. */
   --dbg:#F3F4F6; --dsurf:#FFFFFF; --dcard:#FFFFFF; --dline:#E6E8EB;
   --dink:#0A0A0C; --dmut:#6B6C72;
   /* roles */
@@ -282,7 +282,7 @@ const h = (type, props, ...kids) => {
 };
 const html = htm.bind(h);
 
-/* ═══════════ backend adapter — the ONLY place that touches data ═══════════ */
+/* ═══════════ backend adapter: the only place that talks to Convex ═══════════ */
 const CONVEX_URL = "https://beloved-malamute-462.convex.cloud";
 const client = new ConvexClient(CONVEX_URL);
 const api = anyApi;
@@ -336,7 +336,7 @@ async function uploadPhoto(file) {
   const { storageId } = await res.json();
   return storageId;
 }
-/* Two-stage, both learned the hard way: high accuracy waits for a GPS fix and
+/* Two attempts. High accuracy waits for a GPS fix and
    simply times out on most laptops, so fall back to a coarse wifi lookup before
    giving up; and the timeout has to outlast a human deciding to tap Allow. */
 function getPosition() {
@@ -429,7 +429,7 @@ function Shell({ light, clock, children }) {
     </div>`;
 }
 
-/* ═══════════ ROUTE / — REPORTER ═══════════ */
+/* ═══════════ ROUTE / (reporter) ═══════════ */
 function Reporter() {
   const [screen, setScreen] = useState("home");
   const [cat, setCat] = useState(null);
@@ -499,10 +499,10 @@ function Reporter() {
           <${Icon} d=${I.pin} s=${16} style=${{color:"var(--red)"}}/>
           Location Access
           <span style=${{color:pos===null?"var(--amber)":pos===undefined?"var(--dmut)":"var(--green)",fontWeight:750}}>
-            ${pos === undefined ? "Locating…" : pos === null ? "Off — tap to retry" : "Enabled"}</span>
+            ${pos === undefined ? "Locating…" : pos === null ? "Off, tap to retry" : "Enabled"}</span>
         </button>
         <p class="cap">${pos === null
-          ? "You can still report — we'll ask for the zone instead."
+          ? "You can still report. We'll ask for the zone instead."
           : "Your location helps us respond faster."}</p>
       </div>
     </div>`;
@@ -530,7 +530,7 @@ function Reporter() {
               ${(venue ? venue.gates : []).map((g) => html`<option key=${g.name} value=${g.name}>${g.name}</option>`)}
             </select>
             ${!zone && html`<div class="counter" style="text-align:left;color:var(--amber)">
-              Location unavailable — please choose a zone.</div>`}`
+              Location unavailable. Please choose a zone.</div>`}`
           : html`
             <div class="loc">
               <${Icon} d=${I.pin} s=${18} style=${{color:"var(--red)"}}/>
@@ -551,7 +551,7 @@ function Reporter() {
             placeholder="So the control room can call you back"
             onChange=${(e) => setPhone(e.target.value.replace(/\D/g, ""))}/>
           <div class="counter" style="text-align:left">
-            Only used to call you back. Skip it — it never delays your report.</div>
+            Only used to call you back. Skipping it never delays your report.</div>
         </div>
         ${!demo && html`<div class="field">
           <span class="lbl">Add Photo <span style="text-transform:none;letter-spacing:0">(Optional)</span></span>
@@ -748,7 +748,7 @@ function Responder() {
           onChange=${(e) => { setUnitId(e.target.value); localStorage.setItem("aegis_unit", e.target.value); }}>
           <option value="">Select your unit…</option>
           ${(responders || []).map((r) => html`
-            <option key=${r._id} value=${r._id}>${r.code} — ${r.name} (${r.role})</option>`)}
+            <option key=${r._id} value=${r._id}>${r.code}: ${r.name} (${r.role})</option>`)}
         </select>
 
         ${!unit ? html`<p class="muted center" style="padding:40px 0">Select your unit to go on duty.</p>`
@@ -761,7 +761,7 @@ function Responder() {
               <span class="mono muted">${unit.code}</span>
             </div>
             <p class="muted" style="margin-top:16px">
-              <span style="color:var(--green)">●</span> On duty — you'll be alerted on assignment.</p>
+              <span style="color:var(--green)">●</span> On duty. You'll be alerted when assigned.</p>
           </div>`
         : html`
           <div class="assign">
@@ -927,19 +927,18 @@ function Command() {
 
                 <div class=${"aipanel" + (detail.aiFailed ? " fail" : "")}>
                   <span class="lbl" style=${{color: detail.aiFailed ? "var(--amber)" : "var(--red)"}}>
-                    ${detail.aiFailed ? "AI unavailable — manual mode" : "AI suggestion"}</span>
+                    ${detail.aiFailed ? "AI unavailable, manual mode" : "AI suggestion"}</span>
                   <p style="font-size:13.5px;margin:8px 0 10px">
                     ${detail.aiFailed ? "Rule-based severity applied. Operator judgement required." : detail.summary}</p>
-                  ${/* Labelled as corroboration, not model confidence — it is
-                       derived from how many independent reports describe the
-                       same incident, which is a real signal. */""}
+                  ${/* The bar shows corroboration: how many independent reports
+                       describe the same incident. */""}
                   <div style="display:flex;align-items:center;gap:10px">
                     <div class="confbar" style="flex:1"><i style=${{width: detail.confidence + "%"}}></i></div>
                     <span class="mono" style="font-size:11.5px">
                       ${detail.reportCount} independent report${detail.reportCount === 1 ? "" : "s"}</span>
                   </div>
                   <div class="muted" style="font-size:10.5px;margin-top:4px">
-                    Corroboration, not a model confidence score.</div>
+                    Corroboration from independent reports.</div>
                 </div>
 
                 <span class="lbl">Recommended actions</span>
@@ -993,7 +992,7 @@ function Command() {
                   : html`<input class="inp" style="margin-top:8px" placeholder="Message to every phone on site…"
                   value=${msg} onChange=${(e) => setMsg(e.target.value)}/>`}
                 <div class="tmpl">
-                  ${["Evacuate via Gate 3B","Avoid the east concourse","Medical corridor in use — keep Gate 2 clear"]
+                  ${["Evacuate via Gate 3B","Avoid the east concourse","Medical corridor in use, keep Gate 2 clear"]
                     .map((t) => html`<button key=${t} onClick=${() => setMsg(t)}>${t}</button>`)}
                 </div>
                 <div style="display:flex;gap:9px">
@@ -1009,7 +1008,7 @@ function Command() {
     <//>`;
 }
 
-/* schematic venue map — never an empty box */
+/* schematic venue map, drawn from the venue's own coordinates */
 function VenueMap({ venue, incidents, responders }) {
   if (!venue) return html`<div class="muted center" style="padding:50px 0">Loading venue…</div>`;
   const pts = [...venue.gates.map((g) => [g.lng, g.lat]),
@@ -1049,7 +1048,7 @@ function VenueMap({ venue, incidents, responders }) {
     </svg>`;
 }
 
-/* ═══════════ router — 3 routes + catch-all redirect ═══════════ */
+/* ═══════════ router: three hash routes, anything else goes to the reporter ═══════════ */
 function App() {
   const [path, setPath] = useState(() => location.hash.replace("#", "") || "/");
   useEffect(() => {

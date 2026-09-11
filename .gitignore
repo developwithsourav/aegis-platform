@@ -30,3 +30,10 @@ dist-ssr
 
 # Convex generated code (rebuilt by npx convex dev)
 convex/_generated/
+
+# Local AI assistant configuration (kept on disk, not published)
+CLAUDE.md
+AGENTS.md
+.agents/
+.claude/
+skills-lock.json

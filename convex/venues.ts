@@ -1,20 +1,16 @@
-import { mutation, query } from "./_generated/server";
+import { mutation, query, type MutationCtx } from "./_generated/server";
 import { v } from "convex/values";
 
-/* Venue catalogue + live switching.
+/* Venue catalogue and live venue switching.
 
-   AEGIS is not tied to one site: the venue, its zones and its responding units
-   are data. This module lets an operator switch the active venue from the
-   dashboard instead of re-seeding from a terminal.
+   A venue, its zones and its responding units are data, so the same backend can
+   run any site. One venue is active at a time. Switching replaces the venue
+   document and its responder roster and clears the incident board.
 
-   Deliberately additive — it does not change the schema or submitReport. The
-   system still has exactly ONE active venue at a time; switching swaps the
-   venue document and its responder roster, exactly as the seed scripts do.
-
-   HONEST NOTE ON THE DATA: these are real institutions at coordinates taken
-   from general knowledge, accurate to roughly a few hundred metres. Good
-   enough to demonstrate nearest-unit dispatch; NOT a verified facility feed.
-   Production would ingest data.gov.in or OpenStreetMap. Say so if asked. */
+   About the data: these are real places at approximate coordinates, accurate to
+   a few hundred metres. That is enough to show nearest-unit dispatch, but it is
+   not a verified facility feed. A real deployment would load venue and facility
+   data from data.gov.in or OpenStreetMap. */
 
 type Gate = { name: string; lat: number; lng: number; isExit: boolean };
 type Unit = { code: string; name: string; role: string; lat: number; lng: number };
@@ -47,15 +43,15 @@ export const CATALOG: Record<string, {
 
   delhi_central: {
     state: "Delhi",
-    name: "Central Delhi — VVIP & Mass Gathering Zone",
+    name: "Central Delhi: VVIP & Mass Gathering Zone",
     centerLat: 28.6220, centerLng: 77.2150, zoomLevel: 14,
     gates: [
       { name: "Jantar Mantar (protest ground)", lat: 28.6270, lng: 77.2166, isExit: false },
-      { name: "Connaught Place — Inner Circle", lat: 28.6315, lng: 77.2167, isExit: false },
+      { name: "Connaught Place, Inner Circle", lat: 28.6315, lng: 77.2167, isExit: false },
       { name: "Parliament House", lat: 28.6172, lng: 77.2082, isExit: false },
       { name: "PMO / South Block", lat: 28.6143, lng: 77.2095, isExit: false },
       { name: "Central Secretariat", lat: 28.6146, lng: 77.2119, isExit: false },
-      { name: "RBI — Sansad Marg", lat: 28.6265, lng: 77.2190, isExit: false },
+      { name: "RBI, Sansad Marg", lat: 28.6265, lng: 77.2190, isExit: false },
       { name: "Kartavya Path", lat: 28.6129, lng: 77.2295, isExit: false },
       { name: "Patel Chowk Metro (dispersal)", lat: 28.6226, lng: 77.2145, isExit: true },
       { name: "Rajiv Chowk Metro (dispersal)", lat: 28.6330, lng: 77.2197, isExit: true },
@@ -78,10 +74,10 @@ export const CATALOG: Record<string, {
     name: "Arun Jaitley Stadium, Feroz Shah Kotla",
     centerLat: 28.6379, centerLng: 77.2432, zoomLevel: 16,
     gates: [
-      { name: "Gate 1 — Bhishma Pitamah Marg", lat: 28.6388, lng: 77.2419, isExit: true },
-      { name: "Gate 3 — North Stand", lat: 28.6392, lng: 77.2441, isExit: true },
-      { name: "Gate 6 — Pavilion End", lat: 28.6368, lng: 77.2444, isExit: false },
-      { name: "Gate 9 — Old Clubhouse", lat: 28.6366, lng: 77.2420, isExit: true },
+      { name: "Gate 1, Bhishma Pitamah Marg", lat: 28.6388, lng: 77.2419, isExit: true },
+      { name: "Gate 3, North Stand", lat: 28.6392, lng: 77.2441, isExit: true },
+      { name: "Gate 6, Pavilion End", lat: 28.6368, lng: 77.2444, isExit: false },
+      { name: "Gate 9, Old Clubhouse", lat: 28.6366, lng: 77.2420, isExit: true },
       { name: "Player Pavilion", lat: 28.6377, lng: 77.2430, isExit: false },
       { name: "Concourse Food Zone", lat: 28.6383, lng: 77.2436, isExit: false },
       { name: "Delhi Gate Metro (dispersal)", lat: 28.6395, lng: 77.2400, isExit: true },
@@ -114,27 +110,35 @@ export const listVenues = query({
   },
 });
 
-/** Switch the live venue. Replaces the venue document and its responder
-    roster, then clears incidents so the board reflects the new site. */
+/** Switch the live venue and clear the board so it reflects the new site. */
 export const setActiveVenue = mutation({
   args: { key: v.string() },
   handler: async (ctx, { key }) => {
     const target = CATALOG[key];
     if (!target) return { ok: false, reason: `unknown venue "${key}"` };
-
-    for (const t of ["venue", "responders", "incidents", "reports", "events"] as const)
-      for (const row of await ctx.db.query(t).collect()) await ctx.db.delete(row._id);
-
-    await ctx.db.insert("venue", {
-      name: target.name,
-      centerLat: target.centerLat,
-      centerLng: target.centerLng,
-      zoomLevel: target.zoomLevel,
-      gates: target.gates,
-    });
-    for (const r of target.responders)
-      await ctx.db.insert("responders", { ...r, available: true, lastSeen: Date.now() });
-
+    await clearIncidents(ctx);
+    await installVenue(ctx, key);
     return { ok: true, venue: target.name, state: target.state, units: target.responders.length };
   },
 });
+
+/** Replace the active venue and its responder roster with a catalogue entry. */
+export async function installVenue(ctx: MutationCtx, key: keyof typeof CATALOG) {
+  const { name, centerLat, centerLng, zoomLevel, gates, responders } = CATALOG[key];
+  for (const table of ["venue", "responders"] as const)
+    for (const row of await ctx.db.query(table).collect()) await ctx.db.delete(row._id);
+  await ctx.db.insert("venue", { name, centerLat, centerLng, zoomLevel, gates });
+  for (const r of responders)
+    await ctx.db.insert("responders", { ...r, available: true, lastSeen: Date.now() });
+  return responders.length;
+}
+
+/** Delete every incident, report, photo, event and broadcast, and free all responders. */
+export async function clearIncidents(ctx: MutationCtx) {
+  for (const report of await ctx.db.query("reports").collect())
+    if (report.photoId) await ctx.storage.delete(report.photoId);
+  for (const table of ["incidents", "reports", "events", "broadcasts"] as const)
+    for (const row of await ctx.db.query(table).collect()) await ctx.db.delete(row._id);
+  for (const r of await ctx.db.query("responders").collect())
+    await ctx.db.patch(r._id, { available: true });
+}

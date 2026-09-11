@@ -1,37 +1,30 @@
-import { mutation, query, internalMutation } from "./_generated/server";
+import { mutation, query, internalMutation, type QueryCtx, type MutationCtx } from "./_generated/server";
 import { internal } from "./_generated/api";
 import { v, ConvexError } from "convex/values";
+import { haversineMeters, etaMinutes, corroboration, ROLE_FOR_CATEGORY } from "./model";
 
-const WALK_SPEED_M_PER_MIN = 84; // ~1.4 m/s
-const DEDUP_WINDOW_MS = 120_000;
+/* Incident lifecycle:
+   report -> ai_processing -> verified -> dispatched -> en_route -> on_scene -> resolved */
 
-/* Public demo mode (DEMO_MODE=1 on the deployment). The live demo is open to
-   anyone with the link, so it keeps no real phone numbers, takes no photo
-   uploads, only lets the preset exit guidance go out to every screen, and
-   caps how fast reports can come in. Everything is wiped hourly (crons.ts). */
+const DEDUP_WINDOW_MS = 2 * 60_000;
+const ESCALATE_AFTER_MS = 60_000;
+
+/* Public demo mode, switched on with DEMO_MODE=1 on the deployment. Anyone with
+   the link can use the demo, so it stores only the last two digits of a callback
+   number, refuses photo uploads, sends only the preset broadcasts and rate limits
+   reports. crons.ts wipes the incidents every hour. */
 const isDemo = () => process.env.DEMO_MODE === "1";
-const DEMO_REPORT_LIMIT = 40;          // reports ...
-const DEMO_REPORT_WINDOW_MS = 600_000; // ... per 10 minutes
-export const DEMO_BROADCASTS = [
+const DEMO_REPORT_LIMIT = 40;
+const DEMO_REPORT_WINDOW_MS = 10 * 60_000;
+const DEMO_BROADCASTS = [
   "Evacuate via Gate 3B",
   "Avoid the east concourse",
-  "Medical corridor in use — keep Gate 2 clear",
+  "Medical corridor in use, keep Gate 2 clear",
 ];
-const maskPhone = (p: string) => p.replace(/\d(?=\d{2})/g, "X");
+const maskPhone = (phone: string) => phone.replace(/\d(?=\d{2})/g, "X");
 
-function haversineMeters(aLat: number, aLng: number, bLat: number, bLng: number) {
-  const R = 6371000;
-  const dLat = ((bLat - aLat) * Math.PI) / 180;
-  const dLng = ((bLng - aLng) * Math.PI) / 180;
-  const s =
-    Math.sin(dLat / 2) ** 2 +
-    Math.cos((aLat * Math.PI) / 180) * Math.cos((bLat * Math.PI) / 180) * Math.sin(dLng / 2) ** 2;
-  return 2 * R * Math.asin(Math.sqrt(s));
-}
+// ---------- reporting ----------
 
-export const etaMinutes = (meters: number) => Math.max(1, Math.round(meters / WALK_SPEED_M_PER_MIN));
-
-// ---------- photo upload ----------
 export const generateUploadUrl = mutation({
   args: {},
   handler: async (ctx) => {
@@ -40,103 +33,116 @@ export const generateUploadUrl = mutation({
   },
 });
 
-// ---------- report ingestion with dedup ----------
+/* Optional fields accept null as well as undefined, because browsers send null
+   for empty values (lat and lng when GPS is denied, for example). */
+const optionalString = v.optional(v.union(v.string(), v.null()));
+const optionalNumber = v.optional(v.union(v.number(), v.null()));
+
 export const submitReport = mutation({
-  // Accept null as well as undefined for every optional field. Browser clients
-  // routinely send `null` for an empty value (e.g. lat when GPS is denied), and
-  // Convex validators treat null and undefined as distinct — without this, any
-  // report without GPS is rejected with an ArgumentValidationError.
   args: {
     category: v.string(),
-    description: v.optional(v.union(v.string(), v.null())),
-    phone: v.optional(v.union(v.string(), v.null())),
-    lat: v.optional(v.union(v.number(), v.null())),
-    lng: v.optional(v.union(v.number(), v.null())),
-    zone: v.optional(v.union(v.string(), v.null())),
+    description: optionalString,
+    phone: optionalString,
+    lat: optionalNumber,
+    lng: optionalNumber,
+    zone: optionalString,
     photoId: v.optional(v.union(v.id("_storage"), v.null())),
   },
   handler: async (ctx, raw) => {
-    // Normalize null -> undefined so the rest of the logic and the reports
-    // insert (which uses the strict optional-number schema) stay clean.
     const demo = isDemo();
+    const now = Date.now();
+
     if (demo) {
       const recent = await ctx.db.query("reports").order("desc").take(DEMO_REPORT_LIMIT);
-      if (recent.length === DEMO_REPORT_LIMIT &&
-          Date.now() - recent[recent.length - 1]._creationTime < DEMO_REPORT_WINDOW_MS)
+      const oldest = recent[DEMO_REPORT_LIMIT - 1];
+      if (oldest && now - oldest._creationTime < DEMO_REPORT_WINDOW_MS)
         throw new ConvexError("The demo is busy. Try again in a few minutes.");
     }
-    const args = {
+
+    const report = {
       category: raw.category,
       description: raw.description ?? undefined,
-      // In the public demo a real number is never stored, only its last two digits.
       phone: raw.phone ? (demo ? maskPhone(raw.phone) : raw.phone) : undefined,
-      lat: raw.lat ?? undefined,
-      lng: raw.lng ?? undefined,
       zone: raw.zone ?? undefined,
       photoId: demo ? undefined : raw.photoId ?? undefined,
+      lat: raw.lat ?? undefined,
+      lng: raw.lng ?? undefined,
     };
-    // resolve zone: nearest venue gate if GPS given, else manual zone, else Unknown
-    let zone = args.zone ?? "Unknown zone";
-    let lat = args.lat, lng = args.lng;
-    const venue = await ctx.db.query("venue").first();
-    if (lat !== undefined && lng !== undefined && venue) {
-      let best = Infinity;
-      for (const g of venue.gates) {
-        const d = haversineMeters(lat, lng, g.lat, g.lng);
-        if (d < best) { best = d; zone = "Near " + g.name; }
-      }
-    }
-    if ((lat === undefined || lng === undefined) && venue) {
-      // manual zone: pin to the named gate, else venue center
-      const g = venue.gates.find((g) => args.zone && args.zone.includes(g.name));
-      lat = g ? g.lat : venue.centerLat;
-      lng = g ? g.lng : venue.centerLng;
-    }
-    lat = lat ?? 0; lng = lng ?? 0;
 
-    // dedup: same category + zone, open, within window
-    const now = Date.now();
-    const open = await ctx.db
-      .query("incidents")
-      .filter((q) => q.and(q.eq(q.field("category"), args.category), q.neq(q.field("status"), "resolved")))
-      .collect();
-    const twin = open.find((i) => i.zone === zone && now - i._creationTime < DEDUP_WINDOW_MS);
+    const { zone, lat, lng } = await locate(ctx, report);
+
+    // A report of the same category in the same zone within the window is the
+    // same event: attach it to the open incident instead of opening a new one.
+    const twin = await findOpenTwin(ctx, report.category, zone, now);
     if (twin) {
-      await ctx.db.insert("reports", { ...args, zone, incidentId: twin._id });
-      // Corroboration rises because another independent person reported the
-      // same thing in the same place. Keep this the single source of the
-      // number so it stays explainable: 25 for one report, +20 per extra.
-      const merged = twin.reportCount + 1;
-      await ctx.db.patch(twin._id, {
-        reportCount: merged,
-        confidence: Math.min(90, 25 + (merged - 1) * 20),
-      });
+      const reportCount = twin.reportCount + 1;
+      await ctx.db.insert("reports", { ...report, zone, incidentId: twin._id });
+      await ctx.db.patch(twin._id, { reportCount, confidence: corroboration(reportCount) });
       await ctx.db.insert("events", {
         incidentId: twin._id,
-        msg: `Duplicate report merged (now ${twin.reportCount + 1} reports)`,
+        msg: `Duplicate report merged (now ${reportCount} reports)`,
       });
       return { incidentId: twin._id, merged: true };
     }
 
     const incidentId = await ctx.db.insert("incidents", {
-      category: args.category,
+      category: report.category,
       priority: 3,
       headline: "Analyzing...",
       summary: "",
-      confidence: 40,
+      confidence: corroboration(1),
       sopSteps: [],
       sopSource: "",
       reportCount: 1,
       lat, lng, zone,
       status: "ai_processing",
     });
-    await ctx.db.insert("reports", { ...args, zone, incidentId });
+    await ctx.db.insert("reports", { ...report, zone, incidentId });
     await ctx.db.insert("events", { incidentId, msg: "Report received" });
     await ctx.scheduler.runAfter(0, internal.ai.triage, { incidentId });
-    await ctx.scheduler.runAfter(60_000, internal.incidents.escalateIfUnhandled, { incidentId });
+    await ctx.scheduler.runAfter(ESCALATE_AFTER_MS, internal.incidents.escalateIfUnhandled, { incidentId });
     return { incidentId, merged: false };
   },
 });
+
+/* Where a report is. With GPS: the nearest named gate or zone of the venue.
+   Without GPS: the zone the reporter picked, else the venue centre. A report is
+   never rejected for lacking a location. */
+async function locate(ctx: QueryCtx, report: { lat?: number; lng?: number; zone?: string }) {
+  const venue = await ctx.db.query("venue").first();
+  if (!venue) return { zone: report.zone ?? "Unknown zone", lat: report.lat ?? 0, lng: report.lng ?? 0 };
+
+  if (report.lat !== undefined && report.lng !== undefined) {
+    let nearest = venue.gates[0];
+    let best = Infinity;
+    for (const gate of venue.gates) {
+      const d = haversineMeters(report.lat, report.lng, gate.lat, gate.lng);
+      if (d < best) { best = d; nearest = gate; }
+    }
+    return { zone: "Near " + nearest.name, lat: report.lat, lng: report.lng };
+  }
+
+  const picked = venue.gates.find((g) => report.zone?.includes(g.name));
+  return {
+    zone: report.zone ?? "Unknown zone",
+    lat: picked ? picked.lat : venue.centerLat,
+    lng: picked ? picked.lng : venue.centerLng,
+  };
+}
+
+async function findOpenTwin(ctx: QueryCtx, category: string, zone: string, now: number) {
+  const recent = ctx.db
+    .query("incidents")
+    .withIndex("by_category_zone", (q) => q.eq("category", category).eq("zone", zone))
+    .order("desc");
+  for await (const incident of recent) {
+    if (now - incident._creationTime > DEDUP_WINDOW_MS) return null;
+    if (incident.status !== "resolved") return incident;
+  }
+  return null;
+}
+
+// ---------- triage and escalation (called by the scheduler) ----------
 
 export const applyTriage = internalMutation({
   args: {
@@ -150,19 +156,17 @@ export const applyTriage = internalMutation({
     aiFailed: v.optional(v.boolean()),
   },
   handler: async (ctx, { incidentId, ...fields }) => {
-    const inc = await ctx.db.get(incidentId);
-    if (!inc) return;
-    // confidence already reflects corroboration (see ai.ts); do not inflate it
-    // again here, which previously double counted the merged reports.
+    const incident = await ctx.db.get(incidentId);
+    if (!incident) return;
     await ctx.db.patch(incidentId, {
       ...fields,
-      status: inc.status === "ai_processing" ? "verified" : inc.status,
+      status: incident.status === "ai_processing" ? "verified" : incident.status,
     });
     await ctx.db.insert("events", {
       incidentId,
       msg: fields.aiFailed
         ? "AI unavailable, manual mode (rule based severity applied)"
-        : "AI triage complete",
+        : "Triage complete",
     });
   },
 });
@@ -170,8 +174,9 @@ export const applyTriage = internalMutation({
 export const escalateIfUnhandled = internalMutation({
   args: { incidentId: v.id("incidents") },
   handler: async (ctx, { incidentId }) => {
-    const inc = await ctx.db.get(incidentId);
-    if (inc && inc.priority === 1 && (inc.status === "ai_processing" || inc.status === "verified")) {
+    const incident = await ctx.db.get(incidentId);
+    const unhandled = incident?.status === "ai_processing" || incident?.status === "verified";
+    if (incident?.priority === 1 && unhandled) {
       await ctx.db.insert("events", {
         incidentId,
         msg: "ESCALATED to control lead, P1 unacknowledged for 60 s",
@@ -181,44 +186,50 @@ export const escalateIfUnhandled = internalMutation({
 });
 
 // ---------- dispatch and lifecycle ----------
+
+/* Nearest available responder whose role matches the category, else the nearest
+   available responder of any role. Distance decides, not a model. */
 export const dispatch = mutation({
   args: { incidentId: v.id("incidents") },
   handler: async (ctx, { incidentId }) => {
-    const inc = await ctx.db.get(incidentId);
-    if (!inc || inc.assignedResponderId) return { ok: false, reason: "already assigned" };
-    const prefer: Record<string, string> = {
-      medical: "medic", fire: "fire", crowd: "marshal", violence_security: "security",
-    };
-    const pool = await ctx.db
+    const incident = await ctx.db.get(incidentId);
+    if (!incident || incident.assignedResponderId) return { ok: false, reason: "already assigned" };
+
+    const available = await ctx.db
       .query("responders")
       .withIndex("by_available", (q) => q.eq("available", true))
       .collect();
-    const pick = (cands: typeof pool) => {
-      let best = null, bestD = Infinity;
-      for (const r of cands) {
-        const d = haversineMeters(inc.lat, inc.lng, r.lat, r.lng);
-        if (d < bestD) { bestD = d; best = r; }
+
+    const nearest = (candidates: typeof available) => {
+      let pick = null;
+      let pickDistance = Infinity;
+      for (const r of candidates) {
+        const d = haversineMeters(incident.lat, incident.lng, r.lat, r.lng);
+        if (d < pickDistance) { pick = r; pickDistance = d; }
       }
-      return best ? { r: best, d: bestD } : null;
+      return pick ? { responder: pick, meters: pickDistance } : null;
     };
-    const wanted = prefer[inc.category];
-    const chosen = (wanted && pick(pool.filter((r) => r.role === wanted))) || pick(pool);
+
+    const role = ROLE_FOR_CATEGORY[incident.category];
+    const chosen = (role && nearest(available.filter((r) => r.role === role))) || nearest(available);
     if (!chosen) return { ok: false, reason: "no responders available" };
-    await ctx.db.patch(chosen.r._id, { available: false });
-    await ctx.db.patch(incidentId, { assignedResponderId: chosen.r._id, status: "dispatched" });
+
+    const { responder, meters } = chosen;
+    await ctx.db.patch(responder._id, { available: false });
+    await ctx.db.patch(incidentId, { assignedResponderId: responder._id, status: "dispatched" });
     await ctx.db.insert("events", {
       incidentId,
-      msg: `${chosen.r.role} ${chosen.r.code} dispatched, ETA ${etaMinutes(chosen.d)} min`,
+      msg: `${responder.role} ${responder.code} dispatched, ETA ${etaMinutes(meters)} min`,
     });
-    return { ok: true, responder: chosen.r.code };
+    return { ok: true, responder: responder.code };
   },
 });
 
 export const acceptAssignment = mutation({
   args: { incidentId: v.id("incidents") },
   handler: async (ctx, { incidentId }) => {
-    const inc = await ctx.db.get(incidentId);
-    if (!inc || inc.status !== "dispatched") return;
+    const incident = await ctx.db.get(incidentId);
+    if (incident?.status !== "dispatched") return;
     await ctx.db.patch(incidentId, { status: "en_route" });
     await ctx.db.insert("events", { incidentId, msg: "Responder accepted, en route" });
   },
@@ -242,116 +253,125 @@ export const markOnScene = mutation({
 export const resolve = mutation({
   args: { incidentId: v.id("incidents") },
   handler: async (ctx, { incidentId }) => {
-    const inc = await ctx.db.get(incidentId);
-    if (!inc) return;
-    if (inc.assignedResponderId) await ctx.db.patch(inc.assignedResponderId, { available: true });
+    const incident = await ctx.db.get(incidentId);
+    if (!incident) return;
+    if (incident.assignedResponderId) await ctx.db.patch(incident.assignedResponderId, { available: true });
     await ctx.db.patch(incidentId, { status: "resolved" });
     await ctx.db.insert("events", { incidentId, msg: "Incident resolved, audit log closed" });
   },
 });
 
-// ---------- broadcasts (exit guidance) ----------
+// ---------- exit guidance broadcasts ----------
+
 export const sendBroadcast = mutation({
   args: { message: v.string() },
   handler: async (ctx, { message }) => {
     if (isDemo() && !DEMO_BROADCASTS.includes(message))
       throw new ConvexError("The public demo only sends the preset messages.");
-    for (const b of await ctx.db.query("broadcasts").collect())
-      await ctx.db.patch(b._id, { active: false });
+    await deactivateBroadcasts(ctx);
     await ctx.db.insert("broadcasts", { message, active: true });
   },
 });
+
 export const clearBroadcast = mutation({
   args: {},
-  handler: async (ctx) => {
-    for (const b of await ctx.db.query("broadcasts").collect())
-      await ctx.db.patch(b._id, { active: false });
-  },
+  handler: async (ctx) => deactivateBroadcasts(ctx),
 });
 
-// ---------- operator login (env based, hackathon grade) ----------
+async function deactivateBroadcasts(ctx: MutationCtx) {
+  const active = await ctx.db
+    .query("broadcasts")
+    .withIndex("by_active", (q) => q.eq("active", true))
+    .collect();
+  for (const b of active) await ctx.db.patch(b._id, { active: false });
+}
+
+// ---------- screen access ----------
+
+/* These checks decide which screens a device may open. They do not protect data:
+   the functions themselves are public, and a production deployment would use
+   Convex Auth with role-scoped functions. Both fail closed, so with no password
+   or passcode set on the deployment nobody gets in. */
 export const login = query({
   args: { email: v.string(), password: v.string() },
   handler: async (_ctx, { email, password }) => {
-    // Fail closed: with no OPERATOR_PASSWORD configured on the deployment,
-    // nobody gets in. Never fall back to a default that lives in the repo.
-    const okEmail = (process.env.OPERATOR_EMAIL ?? "operator").toLowerCase();
-    const okPass = process.env.OPERATOR_PASSWORD;
-    if (!okPass) return { ok: false };
-    const ok = email.toLowerCase() === okEmail && password === okPass;
+    const expectedId = (process.env.OPERATOR_EMAIL ?? "operator").toLowerCase();
+    const expectedPassword = process.env.OPERATOR_PASSWORD;
+    if (!expectedPassword) return { ok: false };
+    const ok = email.toLowerCase() === expectedId && password === expectedPassword;
     return ok ? { ok: true, name: "Control Room" } : { ok: false };
   },
 });
 
-/* Responder devices share one venue passcode. Same fail-closed rule as the
-   operator login: no RESPONDER_PASSCODE configured means nobody gets in.
-   This gates the UI, not the API — real deployments would use Convex Auth with
-   role-scoped functions. It exists so a public demo URL cannot be interfered
-   with by anyone who happens to have the link. */
 export const responderLogin = query({
   args: { passcode: v.string() },
   handler: async (_ctx, { passcode }) => {
     const expected = process.env.RESPONDER_PASSCODE;
-    if (!expected) return { ok: false };
-    return passcode === expected ? { ok: true } : { ok: false };
+    return { ok: !!expected && passcode === expected };
   },
 });
 
-/* The logins above gate screens, not data. In the public demo there is nothing
-   private behind them, so the UI offers a one-click way in instead. */
+/* In the public demo the web app shows one-click entry to every screen. */
 export const demoInfo = query({
   args: {},
   handler: async () => ({ demo: isDemo(), broadcasts: DEMO_BROADCASTS }),
 });
 
 // ---------- live queries ----------
+
 export const liveBoard = query({
   args: {},
   handler: async (ctx) => {
     const incidents = await ctx.db.query("incidents").order("desc").take(60);
-    const out = [];
-    for (const i of incidents) {
-      const responder = i.assignedResponderId ? await ctx.db.get(i.assignedResponderId) : null;
-      out.push({ ...i, responder: responder ? { code: responder.code, role: responder.role, lat: responder.lat, lng: responder.lng } : null });
-    }
-    return out;
+    return Promise.all(incidents.map(async (incident) => {
+      const r = incident.assignedResponderId ? await ctx.db.get(incident.assignedResponderId) : null;
+      return { ...incident, responder: r ? { code: r.code, role: r.role, lat: r.lat, lng: r.lng } : null };
+    }));
   },
 });
 
 export const incidentDetail = query({
   args: { incidentId: v.id("incidents") },
   handler: async (ctx, { incidentId }) => {
-    const inc = await ctx.db.get(incidentId);
-    if (!inc) return null;
-    const reports = await ctx.db.query("reports")
-      .filter((q) => q.eq(q.field("incidentId"), incidentId)).collect();
-    const events = await ctx.db.query("events")
-      .withIndex("by_incident", (q) => q.eq("incidentId", incidentId)).collect();
-    const photos: string[] = [];
-    for (const r of reports) if (r.photoId) {
-      const url = await ctx.storage.getUrl(r.photoId);
-      if (url) photos.push(url);
-    }
-    const responder = inc.assignedResponderId ? await ctx.db.get(inc.assignedResponderId) : null;
-    return { ...inc, reports, events, photos, responder };
+    const incident = await ctx.db.get(incidentId);
+    if (!incident) return null;
+    const reports = await ctx.db
+      .query("reports")
+      .withIndex("by_incident", (q) => q.eq("incidentId", incidentId))
+      .collect();
+    const events = await ctx.db
+      .query("events")
+      .withIndex("by_incident", (q) => q.eq("incidentId", incidentId))
+      .collect();
+    const photoUrls = await Promise.all(
+      reports.flatMap((r) => (r.photoId ? [ctx.storage.getUrl(r.photoId)] : [])),
+    );
+    const responder = incident.assignedResponderId ? await ctx.db.get(incident.assignedResponderId) : null;
+    return { ...incident, reports, events, photos: photoUrls.filter(Boolean), responder };
   },
 });
 
+/* What the reporter's phone shows: status, guidance and who is coming. */
 export const trackIncident = query({
   args: { incidentId: v.id("incidents") },
   handler: async (ctx, { incidentId }) => {
-    const inc = await ctx.db.get(incidentId);
-    if (!inc) return null;
-    const responder = inc.assignedResponderId ? await ctx.db.get(inc.assignedResponderId) : null;
-    const etaMin = responder
-      ? etaMinutes(haversineMeters(inc.lat, inc.lng, responder.lat, responder.lng))
-      : null;
+    const incident = await ctx.db.get(incidentId);
+    if (!incident) return null;
+    const r = incident.assignedResponderId ? await ctx.db.get(incident.assignedResponderId) : null;
     return {
-      status: inc.status, priority: inc.priority, headline: inc.headline,
-      sopSteps: inc.sopSteps, sopSource: inc.sopSource,
-      lat: inc.lat, lng: inc.lng, zone: inc.zone,
-      responder: responder
-        ? { code: responder.code, role: responder.role, lat: responder.lat, lng: responder.lng, etaMin }
+      status: incident.status,
+      priority: incident.priority,
+      headline: incident.headline,
+      sopSteps: incident.sopSteps,
+      sopSource: incident.sopSource,
+      lat: incident.lat,
+      lng: incident.lng,
+      zone: incident.zone,
+      responder: r
+        ? {
+            code: r.code, role: r.role, lat: r.lat, lng: r.lng,
+            etaMin: etaMinutes(haversineMeters(incident.lat, incident.lng, r.lat, r.lng)),
+          }
         : null,
     };
   },
@@ -360,7 +380,7 @@ export const trackIncident = query({
 export const activeBroadcast = query({
   args: {},
   handler: async (ctx) =>
-    (await ctx.db.query("broadcasts").collect()).find((b) => b.active) ?? null,
+    await ctx.db.query("broadcasts").withIndex("by_active", (q) => q.eq("active", true)).first(),
 });
 
 export const respondersList = query({

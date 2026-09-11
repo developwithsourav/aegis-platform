@@ -2,6 +2,7 @@ import { defineSchema, defineTable } from "convex/server";
 import { v } from "convex/values";
 
 export default defineSchema({
+  // One row per tap. Several reports can point at the same incident.
   reports: defineTable({
     category: v.string(), // fire | medical | crowd | accident_infra | violence_security | other
     description: v.optional(v.string()),
@@ -11,26 +12,29 @@ export default defineSchema({
     zone: v.optional(v.string()),
     photoId: v.optional(v.id("_storage")),
     incidentId: v.optional(v.id("incidents")),
-  }),
+  }).index("by_incident", ["incidentId"]),
 
   incidents: defineTable({
     category: v.string(),
-    priority: v.number(), // 1..4
+    priority: v.number(), // 1 (critical) to 4
     headline: v.string(),
     summary: v.string(),
-    confidence: v.number(), // 0..100
+    confidence: v.number(), // corroboration percentage, see model.ts
     sopSteps: v.array(v.string()),
     sopSource: v.string(),
     reportCount: v.number(),
     lat: v.number(),
     lng: v.number(),
     zone: v.string(),
-    status: v.string(), // new | ai_processing | verified | dispatched | en_route | on_scene | resolved
+    status: v.string(), // ai_processing | verified | dispatched | en_route | on_scene | resolved
     assignedResponderId: v.optional(v.id("responders")),
     photoVerified: v.optional(v.boolean()),
     aiFailed: v.optional(v.boolean()),
-  }).index("by_status", ["status"]),
+  })
+    .index("by_status", ["status"])
+    .index("by_category_zone", ["category", "zone"]),
 
+  // Append-only audit trail.
   events: defineTable({
     incidentId: v.id("incidents"),
     msg: v.string(),
@@ -46,6 +50,7 @@ export default defineSchema({
     lastSeen: v.number(),
   }).index("by_available", ["available"]),
 
+  // Response procedures retrieved during triage.
   sops: defineTable({
     category: v.string(),
     title: v.string(),
@@ -59,8 +64,9 @@ export default defineSchema({
   broadcasts: defineTable({
     message: v.string(),
     active: v.boolean(),
-  }),
+  }).index("by_active", ["active"]),
 
+  // The single active venue: its centre and named gates or zones.
   venue: defineTable({
     name: v.string(),
     centerLat: v.number(),
